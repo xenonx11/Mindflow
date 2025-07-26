@@ -9,6 +9,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
+import {googleAI} from '@genkit-ai/googleai';
 
 const TransformToChatGPTpromptInputSchema = z.object({
   brainDump: z.string().describe('The brain dump content to transform into a ChatGPT prompt.'),
@@ -33,6 +34,7 @@ const prompt = ai.definePrompt({
 Brain Dump Content: {{{brainDump}}}
 
 Concise ChatGPT Prompt:`,
+  model: googleAI.model('gemini-2.0-flash'),
 });
 
 const transformToChatGPTpromptFlow = ai.defineFlow(
