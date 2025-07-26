@@ -14,7 +14,8 @@ import { useToast } from "@/hooks/use-toast";
 type CategorizedThoughts = GroupThoughtsIntoCategoriesOutput;
 
 export default function Home() {
-  const [brainDump, setBrainDump] = useState('');
+  const [currentBrainDump, setCurrentBrainDump] = useState('');
+  const [fullBrainDump, setFullBrainDump] = useState('');
   const [categorizedThoughts, setCategorizedThoughts] = useState<CategorizedThoughts['groupedThoughts'] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isChatGPTLoading, setIsChatGPTLoading] = useState(false);
@@ -22,7 +23,7 @@ export default function Home() {
   const { toast } = useToast();
 
   const handleAnalyze = async () => {
-    if (!brainDump.trim()) {
+    if (!currentBrainDump.trim()) {
         toast({
             title: "Input is empty",
             description: "Please enter some thoughts to analyze.",
@@ -32,12 +33,16 @@ export default function Home() {
     }
 
     setIsLoading(true);
-    setCategorizedThoughts(null);
+    
+    const newFullBrainDump = fullBrainDump ? `${fullBrainDump}\n${currentBrainDump}` : currentBrainDump;
+
     try {
-      const { categories } = await categorizeBrainDump({ brainDump });
+      const { categories } = await categorizeBrainDump({ brainDump: newFullBrainDump });
       if (categories && categories.length > 0) {
-        const { groupedThoughts } = await groupThoughtsIntoCategories({ brainDump, categories });
+        const { groupedThoughts } = await groupThoughtsIntoCategories({ brainDump: newFullBrainDump, categories });
         setCategorizedThoughts(groupedThoughts);
+        setFullBrainDump(newFullBrainDump);
+        setCurrentBrainDump(''); // Clear the input textarea
       } else {
         toast({
             title: "Analysis Error",
@@ -62,12 +67,16 @@ export default function Home() {
   
     const newCategorizedThoughts = JSON.parse(JSON.stringify(categorizedThoughts));
     
-    newCategorizedThoughts[categoryIndex].thoughts.splice(thoughtIndex, 1);
+    const deletedThought = newCategorizedThoughts[categoryIndex].thoughts.splice(thoughtIndex, 1)[0];
   
     if (newCategorizedThoughts[categoryIndex].thoughts.length === 0) {
       newCategorizedThoughts.splice(categoryIndex, 1);
     }
     
+    // Update full brain dump
+    const newFullBrainDump = fullBrainDump.split('\n').filter(line => line.trim() !== deletedThought.trim()).join('\n');
+    setFullBrainDump(newFullBrainDump);
+
     if (newCategorizedThoughts.length === 0) {
       setCategorizedThoughts(null);
     } else {
@@ -76,10 +85,10 @@ export default function Home() {
   };
 
   const handleSendToChatGPT = async () => {
-    if (!brainDump.trim()) return;
+    if (!fullBrainDump.trim()) return;
     setIsChatGPTLoading(true);
     try {
-        const { chatGPTprompt } = await transformToChatGPTprompt({ brainDump });
+        const { chatGPTprompt } = await transformToChatGPTprompt({ brainDump: fullBrainDump });
         const url = `https://chat.openai.com/?prompt=${encodeURIComponent(chatGPTprompt)}`;
         window.open(url, '_blank');
     } catch (error) {
@@ -114,22 +123,22 @@ export default function Home() {
         <div className="max-w-4xl mx-auto">
           <div className="space-y-4">
             <Textarea
-              value={brainDump}
+              value={currentBrainDump}
               onChange={(e) => {
-                setBrainDump(e.target.value);
+                setCurrentBrainDump(e.target.value);
               }}
               placeholder="Dump all your thoughts, ideas, and tasks here. Let your mind flow freely..."
               className="min-h-[200px] text-base p-4 rounded-lg shadow-sm"
               rows={10}
             />
             <div className="flex flex-col sm:flex-row gap-2">
-              <Button onClick={handleAnalyze} disabled={isLoading || !brainDump.trim()} className="flex-1 text-lg py-6">
+              <Button onClick={handleAnalyze} disabled={isLoading || !currentBrainDump.trim()} className="flex-1 text-lg py-6">
                 {isLoading ? (
                   <LoaderCircle className="animate-spin mr-2" />
                 ) : null}
                 {isLoading ? 'Analyzing...' : 'Analyze Thoughts'}
               </Button>
-              <Button onClick={handleSendToChatGPT} variant="accent" disabled={isChatGPTLoading || !brainDump.trim()} className="flex-1 text-lg py-6 bg-accent text-accent-foreground hover:bg-accent/90">
+              <Button onClick={handleSendToChatGPT} variant="accent" disabled={isChatGPTLoading || !fullBrainDump.trim()} className="flex-1 text-lg py-6 bg-accent text-accent-foreground hover:bg-accent/90">
                  {isChatGPTLoading ? (
                   <LoaderCircle className="animate-spin mr-2" />
                 ) : <Send className="mr-2" />}
@@ -150,7 +159,7 @@ export default function Home() {
             <h2 className="text-3xl font-bold text-center mb-8 font-headline">Your Organized Thoughts</h2>
             <div className="flex gap-6 overflow-x-auto pb-6 -mx-4 px-4">
               {categorizedThoughts.map(({ category, thoughts }, categoryIndex) => (
-                <div key={category} className="min-w-[320px] md:min-w-[380px] flex-shrink-0 animate-in fade-in-0 zoom-in-95 duration-500">
+                <div key={category + categoryIndex} className="min-w-[320px] md:min-w-[380px] flex-shrink-0 animate-in fade-in-0 zoom-in-95 duration-500">
                     <Card className="h-full shadow-lg hover:shadow-xl transition-shadow">
                     <CardHeader>
                         <CardTitle className="capitalize font-headline">{category}</CardTitle>
@@ -158,7 +167,7 @@ export default function Home() {
                     <CardContent>
                         <ul className="space-y-3">
                         {thoughts.map((thought, thoughtIndex) => (
-                            <li key={thoughtIndex} className="flex items-start justify-between gap-2 p-3 rounded-md bg-secondary/50">
+                            <li key={thought + thoughtIndex} className="flex items-start justify-between gap-2 p-3 rounded-md bg-secondary/50">
                             <span className="flex-grow">{thought}</span>
                             <Button
                                 variant="ghost"
