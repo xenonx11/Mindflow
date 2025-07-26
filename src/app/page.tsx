@@ -21,7 +21,7 @@ export default function Home() {
   const [fullBrainDump, setFullBrainDump] = useState('');
   const [categorizedThoughts, setCategorizedThoughts] = useState<CategorizedThoughts['groupedThoughts'] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isChatGPTLoading, setIsChatGPTLoading] = useState(false);
+  const [chatGPTLoadingCard, setChatGPTLoadingCard] = useState<number | null>(null);
   const [editingThought, setEditingThought] = useState<{categoryIndex: number, thoughtIndex: number, text: string} | null>(null);
   const [editingCategory, setEditingCategory] = useState<{categoryIndex: number, text: string} | null>(null);
 
@@ -145,11 +145,16 @@ export default function Home() {
     // No need to update fullBrainDump here as category names are not part of it.
   }
 
-  const handleSendToChatGPT = async () => {
-    if (!fullBrainDump.trim()) return;
-    setIsChatGPTLoading(true);
+  const handleSendToChatGPT = async (categoryIndex: number) => {
+    if (!categorizedThoughts) return;
+    setChatGPTLoadingCard(categoryIndex);
+
     try {
-        const { chatGPTprompt } = await transformToChatGPTprompt({ brainDump: fullBrainDump });
+        const category = categorizedThoughts[categoryIndex];
+        const thoughtsText = category.thoughts.join('\n');
+        if (!thoughtsText.trim()) return;
+
+        const { chatGPTprompt } = await transformToChatGPTprompt({ brainDump: thoughtsText });
         const url = `https://chat.openai.com/?prompt=${encodeURIComponent(chatGPTprompt)}`;
         window.open(url, '_blank');
     } catch (error) {
@@ -160,7 +165,7 @@ export default function Home() {
             variant: "destructive",
         });
     } finally {
-        setIsChatGPTLoading(false);
+        setChatGPTLoadingCard(null);
     }
   };
 
@@ -199,12 +204,6 @@ export default function Home() {
                 ) : null}
                 {isLoading ? 'Analyzing...' : 'Analyze Thoughts'}
               </Button>
-              <Button onClick={handleSendToChatGPT} variant="outline" disabled={isChatGPTLoading || !categorizedThoughts || categorizedThoughts.length === 0} className="flex-1 text-lg py-6">
-                 {isChatGPTLoading ? (
-                  <LoaderCircle className="animate-spin mr-2" />
-                ) : <Send className="mr-2" />}
-                Send to ChatGPT
-              </Button>
             </div>
           </div>
         </div>
@@ -238,6 +237,14 @@ export default function Home() {
                           ) : (
                             <>
                               <CardTitle className="capitalize font-headline flex-grow">{category}</CardTitle>
+                               <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => handleSendToChatGPT(categoryIndex)} disabled={chatGPTLoadingCard !== null}>
+                                  {chatGPTLoadingCard === categoryIndex ? (
+                                    <LoaderCircle className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Send className="h-4 w-4 text-muted-foreground hover:text-primary" />
+                                  )}
+                                  <span className="sr-only">Send to ChatGPT</span>
+                              </Button>
                               <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => handleEditCategory(categoryIndex)}>
                                   <Edit className="h-4 w-4 text-muted-foreground hover:text-primary" />
                                   <span className="sr-only">Edit category</span>
