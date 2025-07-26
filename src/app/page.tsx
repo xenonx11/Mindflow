@@ -9,8 +9,10 @@ import { categorizeBrainDump } from '@/ai/flows/categorize-brain-dump';
 import type { GroupThoughtsIntoCategoriesOutput } from '@/ai/flows/group-thoughts-into-categories';
 import { groupThoughtsIntoCategories } from '@/ai/flows/group-thoughts-into-categories';
 import { transformToChatGPTprompt } from '@/ai/flows/transform-to-chatgpt-prompt';
-import { LoaderCircle, Send, Trash2, BrainCircuit } from 'lucide-react';
+import { LoaderCircle, Send, Trash2, BrainCircuit, Edit, Check } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
+import { Input } from '@/components/ui/input';
+
 
 type CategorizedThoughts = GroupThoughtsIntoCategoriesOutput;
 
@@ -20,6 +22,7 @@ export default function Home() {
   const [categorizedThoughts, setCategorizedThoughts] = useState<CategorizedThoughts['groupedThoughts'] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isChatGPTLoading, setIsChatGPTLoading] = useState(false);
+  const [editingThought, setEditingThought] = useState<{categoryIndex: number, thoughtIndex: number, text: string} | null>(null);
 
   const { toast } = useToast();
 
@@ -83,6 +86,33 @@ export default function Home() {
     } else {
       setCategorizedThoughts(newCategorizedThoughts);
     }
+  };
+
+  const handleEditThought = (categoryIndex: number, thoughtIndex: number) => {
+    if (!categorizedThoughts) return;
+    const thoughtToEdit = categorizedThoughts[categoryIndex].thoughts[thoughtIndex];
+    setEditingThought({ categoryIndex, thoughtIndex, text: thoughtToEdit });
+  };
+
+  const handleSaveThought = () => {
+    if (!editingThought || !categorizedThoughts) return;
+  
+    const { categoryIndex, thoughtIndex, text } = editingThought;
+  
+    const originalThought = categorizedThoughts[categoryIndex].thoughts[thoughtIndex];
+  
+    // Create a deep copy
+    const newCategorizedThoughts = JSON.parse(JSON.stringify(categorizedThoughts));
+    
+    // Update the thought
+    newCategorizedThoughts[categoryIndex].thoughts[thoughtIndex] = text;
+  
+    // Update the full brain dump
+    const newFullBrainDump = fullBrainDump.replace(originalThought, text);
+  
+    setCategorizedThoughts(newCategorizedThoughts);
+    setFullBrainDump(newFullBrainDump);
+    setEditingThought(null);
   };
 
   const handleSendToChatGPT = async () => {
@@ -169,16 +199,44 @@ export default function Home() {
                         <ul className="space-y-3">
                         {thoughts.map((thought, thoughtIndex) => (
                             <li key={thought + thoughtIndex} className="flex items-start justify-between gap-2 p-3 rounded-md bg-secondary/50">
-                            <span className="flex-grow">{thought}</span>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 shrink-0"
-                                onClick={() => handleDeleteThought(categoryIndex, thoughtIndex)}
-                            >
-                                <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
-                                <span className="sr-only">Delete thought</span>
-                            </Button>
+                            {editingThought?.categoryIndex === categoryIndex && editingThought?.thoughtIndex === thoughtIndex ? (
+                                <div className="flex-grow flex items-center gap-2">
+                                  <Textarea
+                                      value={editingThought.text}
+                                      onChange={(e) => setEditingThought({ ...editingThought, text: e.target.value })}
+                                      className="flex-grow"
+                                      rows={2}
+                                  />
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={handleSaveThought}>
+                                      <Check className="h-4 w-4 text-green-600" />
+                                      <span className="sr-only">Save thought</span>
+                                  </Button>
+                                </div>
+                            ) : (
+                                <>
+                                    <span className="flex-grow">{thought}</span>
+                                    <div className="flex items-center">
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8 shrink-0"
+                                            onClick={() => handleEditThought(categoryIndex, thoughtIndex)}
+                                        >
+                                            <Edit className="h-4 w-4 text-muted-foreground hover:text-primary" />
+                                            <span className="sr-only">Edit thought</span>
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8 shrink-0"
+                                            onClick={() => handleDeleteThought(categoryIndex, thoughtIndex)}
+                                        >
+                                            <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+                                            <span className="sr-only">Delete thought</span>
+                                        </Button>
+                                    </div>
+                                </>
+                            )}
                             </li>
                         ))}
                         </ul>
