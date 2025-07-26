@@ -46,9 +46,15 @@ const prompt = ai.definePrompt({
   output: {
     schema: GroupThoughtsIntoCategoriesOutputSchema,
   },
-  prompt: `You are an expert at categorizing thoughts.
+  prompt: `You are an expert at categorizing thoughts. Your primary goal is to organize the user's brain dump into the given categories with perfect accuracy and no duplication.
 
-You will receive a brain dump of thoughts and a list of categories. Your task is to group the thoughts from the brain dump into the provided categories.
+You will receive a brain dump of thoughts and a list of categories. The brain dump may also contain specific instructions on how to categorize certain thoughts. You MUST follow these instructions precisely.
+
+**CRITICAL RULES:**
+1.  **NO DUPLICATES:** Each unique thought or sentence from the brain dump must be placed in ONLY ONE category. Do not repeat any thought across multiple categories.
+2.  **FOLLOW INSTRUCTIONS:** If the user provides instructions within the brain dump (e.g., "put my shopping list in a 'shopping' category"), you must follow them.
+3.  **BE COMPREHENSIVE:** Every thought from the brain dump must be assigned to one of the provided categories. Do not leave any thoughts out.
+4.  **USE PROVIDED CATEGORIES:** Do not create new categories. Only use the ones provided in the input.
 
 Brain Dump:
 """
@@ -60,12 +66,11 @@ Categories:
 - {{{this}}}
 {{/each}}
 
-Please group each relevant sentence or thought from the brain dump into one of the categories.
+Please group each relevant sentence or thought from the brain dump into one of the categories, strictly following all the rules above.
 Return a JSON object with a "groupedThoughts" key. The value of "groupedThoughts" should be an array of objects.
 Each object in the array must have two keys:
 1. "category": A string representing one of the provided categories.
 2. "thoughts": An array of strings, where each string is a direct quote or a thought from the brain dump that belongs to that category.
-Do not create new categories. Only use the ones provided. Every thought must be assigned to a category.
 `,
 });
 
