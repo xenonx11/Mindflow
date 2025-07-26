@@ -19,14 +19,14 @@ export type GroupThoughtsIntoCategoriesInput = z.infer<
 >;
 
 const GroupedThoughtSchema = z.object({
-  category: z.string().describe('The category for the thoughts.'),
-  thoughts: z.array(z.string()).describe('The thoughts for the category.'),
+  category: z.string().describe('The category for the thoughts. This must be one of the provided categories.'),
+  thoughts: z.array(z.string()).describe('The thoughts for the category. These must be excerpts from the brain dump.'),
 });
 
 const GroupThoughtsIntoCategoriesOutputSchema = z.object({
   groupedThoughts: z
     .array(GroupedThoughtSchema)
-    .describe('An array of categories and their associated thoughts.'),
+    .describe('An array of objects, where each object has a "category" and a "thoughts" array.'),
 });
 export type GroupThoughtsIntoCategoriesOutput = z.infer<
   typeof GroupThoughtsIntoCategoriesOutputSchema
@@ -49,13 +49,23 @@ const prompt = ai.definePrompt({
   prompt: `You are an expert at categorizing thoughts.
 
 You will receive a brain dump of thoughts and a list of categories.
-Your job is to group the thoughts into the categories.
+Your job is to group the thoughts from the brain dump into the provided categories.
 
-Brain Dump: {{{brainDump}}}
-Categories: {{#each categories}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}
+Brain Dump:
+"""
+{{{brainDump}}}
+"""
 
-Return a JSON object with a "groupedThoughts" key, which is an array of objects.
-Each object in the array should have a "category" key (one of the provided categories) and a "thoughts" key (an array of strings from the brain dump that belong to that category).
+Categories:
+{{#each categories}}
+- {{{this}}}
+{{/each}}
+
+Please group each relevant sentence or thought from the brain dump into one of the categories.
+Return a JSON object with a "groupedThoughts" key. The value of "groupedThoughts" should be an array of objects.
+Each object in the array must have two keys:
+1. "category": A string representing one of the provided categories.
+2. "thoughts": An array of strings, where each string is a direct quote or a thought from the brain dump that belongs to that category.
 `,
 });
 
