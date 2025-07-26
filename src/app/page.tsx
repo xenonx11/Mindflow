@@ -199,7 +199,7 @@ export default function Home() {
                 ) : null}
                 {isLoading ? 'Analyzing...' : 'Analyze Thoughts'}
               </Button>
-              <Button onClick={handleSendToChatGPT} variant="outline" disabled={isChatGPTLoading || !fullBrainDump.trim()} className="flex-1 text-lg py-6 bg-accent text-accent-foreground hover:bg-accent/90">
+              <Button onClick={handleSendToChatGPT} variant="outline" disabled={isChatGPTLoading || !categorizedThoughts || categorizedThoughts.length === 0} className="flex-1 text-lg py-6">
                  {isChatGPTLoading ? (
                   <LoaderCircle className="animate-spin mr-2" />
                 ) : <Send className="mr-2" />}
