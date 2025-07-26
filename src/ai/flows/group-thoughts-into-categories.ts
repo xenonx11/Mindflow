@@ -18,10 +18,16 @@ export type GroupThoughtsIntoCategoriesInput = z.infer<
   typeof GroupThoughtsIntoCategoriesInputSchema
 >;
 
-const GroupThoughtsIntoCategoriesOutputSchema = z.record(
-  z.string(),
-  z.array(z.string())
-).describe('A record of categories and their associated thoughts.');
+const GroupedThoughtSchema = z.object({
+  category: z.string().describe('The category for the thoughts.'),
+  thoughts: z.array(z.string()).describe('The thoughts for the category.'),
+});
+
+const GroupThoughtsIntoCategoriesOutputSchema = z.object({
+  groupedThoughts: z
+    .array(GroupedThoughtSchema)
+    .describe('An array of categories and their associated thoughts.'),
+});
 export type GroupThoughtsIntoCategoriesOutput = z.infer<
   typeof GroupThoughtsIntoCategoriesOutputSchema
 >;
@@ -48,7 +54,8 @@ Your job is to group the thoughts into the categories.
 Brain Dump: {{{brainDump}}}
 Categories: {{#each categories}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}
 
-Return a JSON object where the keys are the categories and the values are arrays of thoughts that belong to that category.
+Return a JSON object with a "groupedThoughts" key, which is an array of objects.
+Each object in the array should have a "category" key (one of the provided categories) and a "thoughts" key (an array of strings from the brain dump that belong to that category).
 `,
 });
 

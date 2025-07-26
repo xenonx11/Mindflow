@@ -15,7 +15,7 @@ type CategorizedThoughts = GroupThoughtsIntoCategoriesOutput;
 
 export default function Home() {
   const [brainDump, setBrainDump] = useState('');
-  const [categorizedThoughts, setCategorizedThoughts] = useState<CategorizedThoughts | null>(null);
+  const [categorizedThoughts, setCategorizedThoughts] = useState<CategorizedThoughts['groupedThoughts'] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isChatGPTLoading, setIsChatGPTLoading] = useState(false);
 
@@ -36,7 +36,7 @@ export default function Home() {
     try {
       const { categories } = await categorizeBrainDump({ brainDump });
       if (categories && categories.length > 0) {
-        const groupedThoughts = await groupThoughtsIntoCategories({ brainDump, categories });
+        const { groupedThoughts } = await groupThoughtsIntoCategories({ brainDump, categories });
         setCategorizedThoughts(groupedThoughts);
       } else {
         toast({
@@ -57,21 +57,21 @@ export default function Home() {
     }
   };
 
-  const handleDeleteThought = (category: string, thoughtIndex: number) => {
+  const handleDeleteThought = (categoryIndex: number, thoughtIndex: number) => {
     if (!categorizedThoughts) return;
-
+  
     const newCategorizedThoughts = JSON.parse(JSON.stringify(categorizedThoughts));
     
-    newCategorizedThoughts[category].splice(thoughtIndex, 1);
-
-    if (newCategorizedThoughts[category].length === 0) {
-      delete newCategorizedThoughts[category];
+    newCategorizedThoughts[categoryIndex].thoughts.splice(thoughtIndex, 1);
+  
+    if (newCategorizedThoughts[categoryIndex].thoughts.length === 0) {
+      newCategorizedThoughts.splice(categoryIndex, 1);
     }
     
-    if (Object.keys(newCategorizedThoughts).length === 0) {
-        setCategorizedThoughts(null);
+    if (newCategorizedThoughts.length === 0) {
+      setCategorizedThoughts(null);
     } else {
-        setCategorizedThoughts(newCategorizedThoughts);
+      setCategorizedThoughts(newCategorizedThoughts);
     }
   };
 
@@ -143,11 +143,11 @@ export default function Home() {
             </div>
         )}
 
-        {categorizedThoughts && Object.keys(categorizedThoughts).length > 0 && (
+        {categorizedThoughts && categorizedThoughts.length > 0 && (
           <div className="mt-12">
             <h2 className="text-3xl font-bold text-center mb-8 font-headline">Your Organized Thoughts</h2>
             <div className="flex gap-6 overflow-x-auto pb-6 -mx-4 px-4">
-              {Object.entries(categorizedThoughts).map(([category, thoughts]) => (
+              {categorizedThoughts.map(({ category, thoughts }, categoryIndex) => (
                 <div key={category} className="min-w-[320px] md:min-w-[380px] flex-shrink-0 animate-in fade-in-0 zoom-in-95 duration-500">
                     <Card className="h-full shadow-lg hover:shadow-xl transition-shadow">
                     <CardHeader>
@@ -155,14 +155,14 @@ export default function Home() {
                     </CardHeader>
                     <CardContent>
                         <ul className="space-y-3">
-                        {thoughts.map((thought, index) => (
-                            <li key={index} className="flex items-start justify-between gap-2 p-3 rounded-md bg-secondary/50">
+                        {thoughts.map((thought, thoughtIndex) => (
+                            <li key={thoughtIndex} className="flex items-start justify-between gap-2 p-3 rounded-md bg-secondary/50">
                             <span className="flex-grow">{thought}</span>
                             <Button
                                 variant="ghost"
                                 size="icon"
                                 className="h-8 w-8 shrink-0"
-                                onClick={() => handleDeleteThought(category, index)}
+                                onClick={() => handleDeleteThought(categoryIndex, thoughtIndex)}
                             >
                                 <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
                                 <span className="sr-only">Delete thought</span>
