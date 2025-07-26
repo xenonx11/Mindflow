@@ -20,13 +20,19 @@ export type GroupThoughtsIntoCategoriesInput = z.infer<
 
 const GroupedThoughtSchema = z.object({
   category: z.string().describe('The category for the group of thoughts. This must be one of the provided categories.'),
-  thoughts: z.array(z.string()).describe('An array of thoughts that belong to the specified category. These must be excerpts from the original brain dump.'),
+  thoughts: z
+    .array(z.string())
+    .describe(
+      'An array of thoughts that belong to the specified category. These must be excerpts from the original brain dump.'
+    ),
 });
 
 const GroupThoughtsIntoCategoriesOutputSchema = z.object({
   groupedThoughts: z
     .array(GroupedThoughtSchema)
-    .describe('An array of objects, where each object represents a category and contains the thoughts associated with it.'),
+    .describe(
+      'An array of objects, where each object represents a category and contains the thoughts associated with it.'
+    ),
 });
 export type GroupThoughtsIntoCategoriesOutput = z.infer<
   typeof GroupThoughtsIntoCategoriesOutputSchema
@@ -46,15 +52,16 @@ const prompt = ai.definePrompt({
   output: {
     schema: GroupThoughtsIntoCategoriesOutputSchema,
   },
-  prompt: `You are an expert at categorizing thoughts. Your primary goal is to organize the user's brain dump into the given categories with perfect accuracy and no duplication.
+  prompt: `You are an expert at categorizing thoughts. Your ONLY goal is to organize the user's brain dump into the given categories.
 
 You will receive a brain dump of thoughts and a list of categories. The brain dump may also contain specific instructions on how to categorize certain thoughts. You MUST follow these instructions precisely.
 
-**CRITICAL RULES:**
-1.  **NO DUPLICATES:** Each unique thought or sentence from the brain dump must be placed in ONLY ONE category. Do not repeat any thought across multiple categories.
-2.  **FOLLOW INSTRUCTIONS:** If the user provides instructions within the brain dump (e.g., "put my shopping list in a 'shopping' category"), you must follow them.
-3.  **BE COMPREHENSIVE:** Every thought from the brain dump must be assigned to one of the provided categories. Do not leave any thoughts out.
-4.  **USE PROVIDED CATEGORIES:** Do not create new categories. Only use the ones provided in the input.
+**THE MOST IMPORTANT RULE:**
+1.  **ABSOLUTELY NO DUPLICATES:** Each unique thought or sentence from the brain dump MUST be placed in ONLY ONE category. DO NOT REPEAT any thought across multiple categories. If a thought seems to fit in more than one category, pick the BEST one and move on. Do not list it twice.
+
+**Other Rules:**
+2.  **BE COMPREHENSIVE:** Every thought from the brain dump must be assigned to one of the provided categories. Do not leave any thoughts out.
+3.  **USE PROVIDED CATEGORIES:** Do not create new categories. Only use the ones provided in the input.
 
 Brain Dump:
 """
@@ -66,11 +73,7 @@ Categories:
 - {{{this}}}
 {{/each}}
 
-Please group each relevant sentence or thought from the brain dump into one of the categories, strictly following all the rules above.
-Return a JSON object with a "groupedThoughts" key. The value of "groupedThoughts" should be an array of objects.
-Each object in the array must have two keys:
-1. "category": A string representing one of the provided categories.
-2. "thoughts": An array of strings, where each string is a direct quote or a thought from the brain dump that belongs to that category.
+Please group each relevant sentence or thought from the brain dump into one of the categories, strictly following all the rules above, especially the "NO DUPLICATES" rule.
 `,
 });
 
