@@ -19,7 +19,7 @@ export type GroupThoughtsIntoCategoriesInput = z.infer<
 >;
 
 const GroupedThoughtSchema = z.object({
-  category: z.string().describe('The category for the group of thoughts. This must be one of the provided categories.'),
+  category: z.string().describe('The category for the group of thoughts. This must be one of the provided categories, or a new category if similar ones are merged.'),
   thoughts: z
     .array(z.string())
     .describe(
@@ -52,28 +52,29 @@ const prompt = ai.definePrompt({
   output: {
     schema: GroupThoughtsIntoCategoriesOutputSchema,
   },
-  prompt: `You are an expert at categorizing thoughts. Your ONLY goal is to organize the user's brain dump into the given categories.
+  prompt: `You are an expert at categorizing thoughts. Your goal is to organize the user's brain dump into a clear and concise set of categories.
 
-You will receive a brain dump of thoughts and a list of categories. The brain dump may also contain specific instructions on how to categorize certain thoughts. You MUST follow these instructions precisely.
+You will receive a brain dump of thoughts and a list of suggested categories.
 
-**THE MOST IMPORTANT RULE:**
-1.  **ABSOLUTELY NO DUPLICATES:** Each unique thought or sentence from the brain dump MUST be placed in ONLY ONE category. DO NOT REPEAT any thought across multiple categories. If a thought seems to fit in more than one category, pick the BEST one and move on. Do not list it twice.
+**THE MOST IMPORTANT RULES:**
+1.  **MERGE SIMILAR CATEGORIES:** Before you begin, review the list of categories. If any categories are synonyms or extremely similar, you MUST merge them into a single category. Choose the most descriptive and accurate name for the new, merged category. For example, if you see "work tasks" and "office to-dos", merge them into a single category like "Work Tasks".
+2.  **ABSOLUTELY NO DUPLICATES:** Each unique thought or sentence from the brain dump MUST be placed in ONLY ONE category. DO NOT REPEAT any thought across multiple categories. If a thought seems to fit in more than one category, pick the BEST one and move on.
 
 **Other Rules:**
-2.  **BE COMPREHENSIVE:** Every thought from the brain dump must be assigned to one of the provided categories. Do not leave any thoughts out.
-3.  **USE PROVIDED CATEGORIES:** Do not create new categories. Only use the ones provided in the input.
+3.  **BE COMPREHENSIVE:** Every thought from the brain dump must be assigned to one of your final categories. Do not leave any thoughts out.
+4.  **FOLLOW USER INSTRUCTIONS:** The brain dump may contain specific instructions on how to categorize certain thoughts. You MUST follow these instructions precisely.
 
 Brain Dump:
 """
 {{{brainDump}}}
 """
 
-Categories:
+Suggested Categories:
 {{#each categories}}
 - {{{this}}}
 {{/each}}
 
-Please group each relevant sentence or thought from the brain dump into one of the categories, strictly following all the rules above, especially the "NO DUPLICATES" rule.
+Please group each relevant sentence or thought from the brain dump into the final, consolidated categories, strictly following all the rules above.
 `,
 });
 
