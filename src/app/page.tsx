@@ -22,6 +22,7 @@ export default function Home() {
   const [categorizedThoughts, setCategorizedThoughts] = useState<CategorizedThoughts['groupedThoughts'] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [chatGPTLoadingCard, setChatGPTLoadingCard] = useState<number | null>(null);
+  const [chatGPTLoadingThought, setChatGPTLoadingThought] = useState<{categoryIndex: number, thoughtIndex: number} | null>(null);
   const [editingThought, setEditingThought] = useState<{categoryIndex: number, thoughtIndex: number, text: string} | null>(null);
   const [editingCategory, setEditingCategory] = useState<{categoryIndex: number, text: string} | null>(null);
 
@@ -169,6 +170,29 @@ export default function Home() {
     }
   };
 
+  const handleSendThoughtToChatGPT = async (categoryIndex: number, thoughtIndex: number) => {
+    if (!categorizedThoughts) return;
+    setChatGPTLoadingThought({ categoryIndex, thoughtIndex });
+
+    try {
+      const thoughtText = categorizedThoughts[categoryIndex].thoughts[thoughtIndex];
+      if (!thoughtText.trim()) return;
+
+      const { chatGPTprompt } = await transformToChatGPTprompt({ brainDump: thoughtText });
+      const url = `https://chat.openai.com/?prompt=${encodeURIComponent(chatGPTprompt)}`;
+      window.open(url, '_blank');
+    } catch (error) {
+      console.error(error);
+      toast({
+        title: "Error creating prompt",
+        description: "Failed to generate a prompt for ChatGPT. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setChatGPTLoadingThought(null);
+    }
+  };
+
   return (
     <div className="flex flex-col min-h-screen">
       <header className="py-8 bg-background border-b">
@@ -278,6 +302,20 @@ export default function Home() {
                                       <span className="flex-grow">{thought}</span>
                                       <div className="flex items-center">
                                           <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8 shrink-0"
+                                            onClick={() => handleSendThoughtToChatGPT(categoryIndex, thoughtIndex)}
+                                            disabled={chatGPTLoadingThought !== null}
+                                          >
+                                            {chatGPTLoadingThought?.categoryIndex === categoryIndex && chatGPTLoadingThought?.thoughtIndex === thoughtIndex ? (
+                                              <LoaderCircle className="h-4 w-4 animate-spin" />
+                                            ) : (
+                                              <Send className="h-4 w-4 text-muted-foreground hover:text-primary" />
+                                            )}
+                                            <span className="sr-only">Send thought to ChatGPT</span>
+                                          </Button>
+                                          <Button
                                               variant="ghost"
                                               size="icon"
                                               className="h-8 w-8 shrink-0"
@@ -315,4 +353,5 @@ export default function Home() {
       </footer>
     </div>
   );
-}
+
+    
