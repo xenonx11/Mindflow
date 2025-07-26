@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -115,7 +115,9 @@ export default function Home() {
           <div className="space-y-4">
             <Textarea
               value={brainDump}
-              onChange={(e) => setBrainDump(e.target.value)}
+              onChange={(e) => {
+                setBrainDump(e.target.value);
+              }}
               placeholder="Dump all your thoughts, ideas, and tasks here. Let your mind flow freely..."
               className="min-h-[200px] text-base p-4 rounded-lg shadow-sm"
               rows={10}
@@ -143,7 +145,7 @@ export default function Home() {
             </div>
         )}
 
-        {categorizedThoughts && categorizedThoughts.length > 0 && (
+        {categorizedThoughts && categorizedThoughts.length > 0 && !isLoading && (
           <div className="mt-12">
             <h2 className="text-3xl font-bold text-center mb-8 font-headline">Your Organized Thoughts</h2>
             <div className="flex gap-6 overflow-x-auto pb-6 -mx-4 px-4">
