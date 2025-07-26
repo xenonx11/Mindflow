@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -157,9 +158,9 @@ export default function Home() {
         {categorizedThoughts && categorizedThoughts.length > 0 && !isLoading && (
           <div className="mt-12">
             <h2 className="text-3xl font-bold text-center mb-8 font-headline">Your Organized Thoughts</h2>
-            <div className="flex gap-6 overflow-x-auto pb-6 -mx-4 px-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {categorizedThoughts.map(({ category, thoughts }, categoryIndex) => (
-                <div key={category + categoryIndex} className="min-w-[320px] md:min-w-[380px] flex-shrink-0 animate-in fade-in-0 zoom-in-95 duration-500">
+                <div key={category + categoryIndex} className="animate-in fade-in-0 zoom-in-95 duration-500">
                     <Card className="h-full shadow-lg hover:shadow-xl transition-shadow">
                     <CardHeader>
                         <CardTitle className="capitalize font-headline">{category}</CardTitle>
