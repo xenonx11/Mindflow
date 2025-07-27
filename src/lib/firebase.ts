@@ -14,23 +14,19 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app: FirebaseApp = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+const db = getFirestore(app);
 
+// We need to make sure auth is only initialized on the client
 let auth: Auth;
-
-// Conditionally initialize Auth for browser and server environments.
-// This is the key to fixing the popup issue in new windows.
 if (typeof window !== 'undefined') {
-  // On the client-side, we use initializeAuth with the browserPopupRedirectResolver.
-  // This resolver is specifically designed to handle cross-origin authentication popups.
   auth = initializeAuth(app, {
     persistence: indexedDBLocalPersistence,
     popupRedirectResolver: browserPopupRedirectResolver,
   });
 } else {
-  // On the server-side, we use the standard getAuth.
+  // On the server, we use the standard getAuth.
   auth = getAuth(app);
 }
 
-const db = getFirestore(app);
 
 export { app, auth, db };
