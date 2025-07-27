@@ -12,6 +12,7 @@ import { transformToChatGPTprompt } from '@/ai/flows/transform-to-chatgpt-prompt
 import { LoaderCircle, Send, Trash2, BrainCircuit, Edit, Check } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Input } from '@/components/ui/input';
+import { ThemeSwitcher } from '@/components/theme-switcher';
 
 
 type CategorizedThoughts = GroupThoughtsIntoCategoriesOutput;
@@ -196,16 +197,19 @@ export default function Home() {
   return (
     <div className="flex flex-col min-h-screen">
       <header className="py-8 bg-background border-b">
-        <div className="container mx-auto px-4 md:px-6 text-center">
-          <div className="flex items-center justify-center gap-4 mb-2">
+        <div className="container mx-auto px-4 md:px-6 flex justify-between items-center">
+          <div className="flex items-center gap-4">
             <BrainCircuit className="w-12 h-12 text-primary" />
-            <h1 className="text-4xl md:text-5xl font-bold font-headline tracking-tighter">
-              MindFlow
-            </h1>
+            <div className="text-left">
+              <h1 className="text-4xl md:text-5xl font-bold font-headline tracking-tighter">
+                MindFlow
+              </h1>
+              <p className="text-lg text-muted-foreground">
+                Untangle your thoughts. Let AI find the patterns.
+              </p>
+            </div>
           </div>
-          <p className="text-lg text-muted-foreground">
-            Untangle your thoughts. Let AI find the patterns.
-          </p>
+          <ThemeSwitcher />
         </div>
       </header>
 
@@ -353,5 +357,3 @@ export default function Home() {
       </footer>
     </div>
   );
-
-    
