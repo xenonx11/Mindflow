@@ -261,7 +261,7 @@ export default function Home() {
     });
 
     return (
-        <div ref={setNodeRef} className={`rounded-lg h-full ${isOver ? 'bg-accent/80' : ''}`}>
+        <div ref={setNodeRef} className={`rounded-lg ${isOver ? 'bg-accent/80' : ''}`}>
             {children}
         </div>
     );
@@ -319,11 +319,11 @@ export default function Home() {
             {categorizedThoughts && categorizedThoughts.length > 0 && !isLoading && (
               <div className="mt-12">
                 <h2 className="text-3xl font-bold text-center mb-8 font-headline">Your Organized Thoughts</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start">
                   {categorizedThoughts.map(({ category, thoughts }, categoryIndex) => (
                     <CategoryDropZone key={category + categoryIndex} categoryIndex={categoryIndex}>
-                        <div className="animate-in fade-in-0 zoom-in-95 duration-500 h-full">
-                            <Card className="shadow-lg hover:shadow-xl transition-shadow flex flex-col h-full">
+                        <div className="animate-in fade-in-0 zoom-in-95 duration-500">
+                            <Card className="shadow-lg hover:shadow-xl transition-shadow flex flex-col">
                               <CardHeader className="flex-row items-center gap-2">
                                   {editingCategory?.categoryIndex === categoryIndex ? (
                                     <div className="flex-grow flex items-center gap-2">
