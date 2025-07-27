@@ -424,7 +424,7 @@ function EditableThought({ thought, categoryIndex, thoughtIndex, onSave, onCance
                 {isLoading && !categorizedThoughts ? (
                   <LoaderCircle className="animate-spin mr-2" />
                 ) : null}
-                {isLoading && !categorizedThoughts ? 'Analyzing...' : 'Channelize Thoughts'}
+                {isLoading && !categorizedThoughts ? 'Analyzing...' : 'Untangle Thoughts'}
               </Button>
             </div>
           </div>
