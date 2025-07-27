@@ -319,10 +319,10 @@ export default function Home() {
             {categorizedThoughts && categorizedThoughts.length > 0 && !isLoading && (
               <div className="mt-12">
                 <h2 className="text-3xl font-bold text-center mb-8 font-headline">Your Organized Thoughts</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start">
+                <div className="[column-count:1] md:[column-count:2] lg:[column-count:3] gap-6 space-y-6">
                   {categorizedThoughts.map(({ category, thoughts }, categoryIndex) => (
                     <CategoryDropZone key={category + categoryIndex} categoryIndex={categoryIndex}>
-                        <div className="animate-in fade-in-0 zoom-in-95 duration-500">
+                        <div className="animate-in fade-in-0 zoom-in-95 duration-500 inline-block w-full break-inside-avoid">
                             <Card className="shadow-lg hover:shadow-xl transition-shadow flex flex-col">
                               <CardHeader className="flex-row items-center gap-2">
                                   {editingCategory?.categoryIndex === categoryIndex ? (
@@ -437,3 +437,5 @@ export default function Home() {
     </div>
   );
 }
+
+    
