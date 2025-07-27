@@ -49,8 +49,8 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [chatGPTLoadingCard, setChatGPTLoadingCard] = useState<number | null>(null);
   const [chatGPTLoadingThought, setChatGPTLoadingThought] = useState<{categoryIndex: number, thoughtIndex: number} | null>(null);
-  const [editingThought, setEditingThought] = useState<{categoryIndex: number, thoughtIndex: number, text: string} | null>(null);
-  const [editingCategory, setEditingCategory] = useState<{categoryIndex: number, text: string} | null>(null);
+  const [editingThought, setEditingThought] = useState<{categoryIndex: number, thoughtIndex: number} | null>(null);
+  const [editingCategory, setEditingCategory] = useState<number | null>(null);
 
   const { toast } = useToast();
 
@@ -152,7 +152,7 @@ export default function Home() {
     const newCard = { category: 'New Category', thoughts: [] };
     const newCategorizedThoughts = categorizedThoughts ? [...categorizedThoughts, newCard] : [newCard];
     setCategorizedThoughts(newCategorizedThoughts);
-    setEditingCategory({ categoryIndex: newCategorizedThoughts.length - 1, text: 'New Category' });
+    setEditingCategory(newCategorizedThoughts.length - 1);
   };
 
 
@@ -182,20 +182,16 @@ export default function Home() {
   };
 
   const handleEditThought = (categoryIndex: number, thoughtIndex: number) => {
-    if (!categorizedThoughts) return;
-    const thoughtToEdit = categorizedThoughts[categoryIndex].thoughts[thoughtIndex];
-    setEditingThought({ categoryIndex, thoughtIndex, text: thoughtToEdit });
+    setEditingThought({ categoryIndex, thoughtIndex });
   };
 
-  const handleSaveThought = () => {
-    if (!editingThought || !categorizedThoughts) return;
-  
-    const { categoryIndex, thoughtIndex, text } = editingThought;
+  const handleSaveThought = (categoryIndex: number, thoughtIndex: number, newText: string) => {
+    if (!categorizedThoughts) return;
       
     const newCategorizedThoughts = categorizedThoughts.map((category, cIndex) => {
         if (cIndex === categoryIndex) {
             const newThoughts = [...category.thoughts];
-            newThoughts[thoughtIndex] = text;
+            newThoughts[thoughtIndex] = newText;
             return { ...category, thoughts: newThoughts };
         }
         return category;
@@ -221,26 +217,21 @@ export default function Home() {
   };
 
   const handleEditCategory = (categoryIndex: number) => {
-    if (!categorizedThoughts) return;
-    const categoryToEdit = categorizedThoughts[categoryIndex].category;
-    setEditingCategory({ categoryIndex, text: categoryToEdit });
+    setEditingCategory(categoryIndex);
   }
 
-  const handleSaveCategory = () => {
-    if (!editingCategory || !categorizedThoughts) return;
+  const handleSaveCategory = (categoryIndex: number, newText: string) => {
+    if (!categorizedThoughts) return;
 
-    const { categoryIndex, text } = editingCategory;
-    
     const newCategorizedThoughts = categorizedThoughts.map((category, cIndex) => {
         if (cIndex === categoryIndex) {
-            return { ...category, category: text };
+            return { ...category, category: newText };
         }
         return category;
     });
 
     setCategorizedThoughts(newCategorizedThoughts);
     setEditingCategory(null);
-    // No need to update fullBrainDump here as category names are not part of it.
   }
 
   const handleSendToChatGPT = async (categoryIndex: number) => {
@@ -338,6 +329,65 @@ export default function Home() {
     );
 }
 
+// Sub-component for editing a category title
+function EditableCategoryTitle({ category, categoryIndex, onSave, onCancel, onSendToChatGPT, onDelete, onEdit, chatGPTLoadingCard }) {
+    const [text, setText] = useState(category.category);
+
+    const handleSave = () => {
+        onSave(categoryIndex, text);
+    };
+
+    return (
+        <div className="flex-grow flex items-center gap-2">
+            <Input 
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                className="flex-grow"
+                autoFocus
+                onBlur={handleSave}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSave();
+                    if (e.key === 'Escape') onCancel();
+                }}
+            />
+            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={handleSave}>
+                <Check className="h-4 w-4 text-green-600" />
+                <span className="sr-only">Save category</span>
+            </Button>
+        </div>
+    );
+}
+
+// Sub-component for editing a single thought
+function EditableThought({ thought, categoryIndex, thoughtIndex, onSave, onCancel }) {
+    const [text, setText] = useState(thought);
+    
+    const handleSave = () => {
+        onSave(categoryIndex, thoughtIndex, text);
+    };
+
+    return (
+        <div className="flex-grow flex items-center gap-2">
+            <Textarea
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                className="flex-grow"
+                rows={2}
+                autoFocus
+                onBlur={handleSave}
+                onKeyDown={(e) => {
+                    if (e.key === 'Escape') onCancel();
+                }}
+            />
+            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={handleSave}>
+                <Check className="h-4 w-4 text-green-600" />
+                <span className="sr-only">Save thought</span>
+            </Button>
+        </div>
+    );
+}
+
+
   return (
     <div className="flex flex-col min-h-screen">
       <header className="py-8 bg-background border-b">
@@ -407,29 +457,25 @@ export default function Home() {
                   </div>
                 </div>
                 <div className="[column-count:1] md:[column-count:2] lg:[column-count:3] gap-6 space-y-6">
-                  {categorizedThoughts.map(({ category, thoughts }, categoryIndex) => (
-                    <CategoryDropZone key={`${category}-${categoryIndex}`} categoryIndex={categoryIndex}>
+                  {categorizedThoughts.map((card, categoryIndex) => (
+                    <CategoryDropZone key={`${card.category}-${categoryIndex}`} categoryIndex={categoryIndex}>
                         <div className="animate-in fade-in-0 zoom-in-95 duration-500 inline-block w-full break-inside-avoid">
                             <Card className="shadow-lg hover:shadow-xl transition-shadow flex flex-col">
                               <CardHeader className="flex-row items-center gap-2">
-                                  {editingCategory?.categoryIndex === categoryIndex ? (
-                                    <div className="flex-grow flex items-center gap-2">
-                                      <Input 
-                                        value={editingCategory.text}
-                                        onChange={(e) => setEditingCategory({...editingCategory, text: e.target.value})}
-                                        className="flex-grow"
-                                        autoFocus
-                                        onBlur={handleSaveCategory}
-                                        onKeyDown={(e) => e.key === 'Enter' && handleSaveCategory()}
-                                      />
-                                       <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={handleSaveCategory}>
-                                          <Check className="h-4 w-4 text-green-600" />
-                                          <span className="sr-only">Save category</span>
-                                      </Button>
-                                    </div>
+                                  {editingCategory === categoryIndex ? (
+                                    <EditableCategoryTitle 
+                                      category={card}
+                                      categoryIndex={categoryIndex}
+                                      onSave={handleSaveCategory}
+                                      onCancel={() => setEditingCategory(null)}
+                                      onSendToChatGPT={handleSendToChatGPT}
+                                      onDelete={handleDeleteCategory}
+                                      onEdit={handleEditCategory}
+                                      chatGPTLoadingCard={chatGPTLoadingCard}
+                                    />
                                   ) : (
                                     <>
-                                      <CardTitle className="capitalize font-headline flex-grow">{category}</CardTitle>
+                                      <CardTitle className="capitalize font-headline flex-grow">{card.category}</CardTitle>
                                        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => handleSendToChatGPT(categoryIndex)} disabled={chatGPTLoadingCard !== null}>
                                           {chatGPTLoadingCard === categoryIndex ? (
                                             <LoaderCircle className="h-4 w-4 animate-spin" />
@@ -451,23 +497,16 @@ export default function Home() {
                               </CardHeader>
                               <CardContent className="flex-grow">
                                   <ul className="space-y-3">
-                                  {thoughts.map((thought, thoughtIndex) => (
+                                  {card.thoughts.map((thought, thoughtIndex) => (
                                       <li key={`${categoryIndex}-${thoughtIndex}`} className="flex items-start justify-between gap-2 p-3 rounded-md bg-secondary/50">
                                       {editingThought?.categoryIndex === categoryIndex && editingThought?.thoughtIndex === thoughtIndex ? (
-                                          <div className="flex-grow flex items-center gap-2">
-                                            <Textarea
-                                                value={editingThought.text}
-                                                onChange={(e) => setEditingThought({ ...editingThought, text: e.target.value })}
-                                                className="flex-grow"
-                                                rows={2}
-                                                autoFocus
-                                                onBlur={handleSaveThought}
-                                            />
-                                            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={handleSaveThought}>
-                                                <Check className="h-4 w-4 text-green-600" />
-                                                <span className="sr-only">Save thought</span>
-                                            </Button>
-                                          </div>
+                                          <EditableThought
+                                              thought={thought}
+                                              categoryIndex={categoryIndex}
+                                              thoughtIndex={thoughtIndex}
+                                              onSave={handleSaveThought}
+                                              onCancel={() => setEditingThought(null)}
+                                          />
                                       ) : (
                                           <>
                                               <div className="flex-grow flex items-center">
@@ -528,5 +567,4 @@ export default function Home() {
       </footer>
     </div>
   );
-
-    
+}
