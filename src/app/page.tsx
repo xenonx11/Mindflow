@@ -371,7 +371,7 @@ export default function Home() {
                 </div>
                 <div className="[column-count:1] md:[column-count:2] lg:[column-count:3] gap-6 space-y-6">
                   {categorizedThoughts.map(({ category, thoughts }, categoryIndex) => (
-                    <CategoryDropZone key={category + categoryIndex} categoryIndex={categoryIndex}>
+                    <CategoryDropZone key={`${category}-${categoryIndex}`} categoryIndex={categoryIndex}>
                         <div className="animate-in fade-in-0 zoom-in-95 duration-500 inline-block w-full break-inside-avoid">
                             <Card className="shadow-lg hover:shadow-xl transition-shadow flex flex-col">
                               <CardHeader className="flex-row items-center gap-2">
@@ -412,7 +412,7 @@ export default function Home() {
                               <CardContent className="flex-grow">
                                   <ul className="space-y-3">
                                   {thoughts.map((thought, thoughtIndex) => (
-                                      <li key={thought + thoughtIndex} className="flex items-start justify-between gap-2 p-3 rounded-md bg-secondary/50">
+                                      <li key={`${categoryIndex}-${thoughtIndex}`} className="flex items-start justify-between gap-2 p-3 rounded-md bg-secondary/50">
                                       {editingThought?.categoryIndex === categoryIndex && editingThought?.thoughtIndex === thoughtIndex ? (
                                           <div className="flex-grow flex items-center gap-2">
                                             <Textarea
@@ -487,7 +487,3 @@ export default function Home() {
     </div>
   );
 }
-
-    
-
-    
