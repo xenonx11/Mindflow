@@ -9,7 +9,7 @@ import { categorizeBrainDump } from '@/ai/flows/categorize-brain-dump';
 import type { GroupThoughtsIntoCategoriesOutput } from '@/ai/flows/group-thoughts-into-categories';
 import { groupThoughtsIntoCategories } from '@/ai/flows/group-thoughts-into-categories';
 import { transformToChatGPTprompt } from '@/ai/flows/transform-to-chatgpt-prompt';
-import { LoaderCircle, Send, Trash2, BrainCircuit, Edit, Check, GripVertical } from 'lucide-react';
+import { LoaderCircle, Send, Trash2, BrainCircuit, Edit, Check, GripVertical, RefreshCcw } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Input } from '@/components/ui/input';
 import { ThemeSwitcher } from '@/components/theme-switcher';
@@ -98,6 +98,50 @@ export default function Home() {
       setIsLoading(false);
     }
   };
+
+  const handleReorganize = async () => {
+    if (!fullBrainDump) {
+      toast({
+        title: "No thoughts to reorganize",
+        description: "Please analyze some thoughts first.",
+        variant: "destructive",
+      });
+      return;
+    }
+  
+    setIsLoading(true);
+    setCategorizedThoughts(null);
+  
+    try {
+      const { categories } = await categorizeBrainDump({ brainDump: fullBrainDump });
+      if (categories && categories.length > 0) {
+        const { groupedThoughts } = await groupThoughtsIntoCategories({ brainDump: fullBrainDump, categories });
+        setCategorizedThoughts(groupedThoughts);
+      } else {
+        toast({
+          title: "Reorganization Error",
+          description: "Could not generate new categories from your thoughts. Please try again.",
+          variant: "destructive",
+        });
+        // Restore previous state if reorganization fails to produce categories
+        const { categories: oldCategories } = await categorizeBrainDump({ brainDump: fullBrainDump });
+        if(oldCategories && oldCategories.length > 0) {
+            const { groupedThoughts: oldGroupedThoughts } = await groupThoughtsIntoCategories({ brainDump: fullBrainDump, categories: oldCategories });
+            setCategorizedThoughts(oldGroupedThoughts);
+        }
+      }
+    } catch (error) {
+      console.error(error);
+      toast({
+        title: "An unexpected error occurred",
+        description: "Failed to reorganize thoughts. Please try again later.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
 
   const reGenerateBrainDump = (thoughts: CategorizedThoughts) => {
     return thoughts.map(group => group.thoughts.join('\n')).join('\n');
@@ -300,10 +344,10 @@ export default function Home() {
             />
             <div className="flex flex-col sm:flex-row gap-2">
               <Button onClick={handleAnalyze} disabled={isLoading || !currentBrainDump.trim()} className="flex-1 text-lg py-6">
-                {isLoading ? (
+                {isLoading && !categorizedThoughts ? (
                   <LoaderCircle className="animate-spin mr-2" />
                 ) : null}
-                {isLoading ? 'Analyzing...' : 'Analyze Thoughts'}
+                {isLoading && !categorizedThoughts ? 'Analyzing...' : 'Analyze Thoughts'}
               </Button>
             </div>
           </div>
@@ -318,7 +362,13 @@ export default function Home() {
         <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
             {categorizedThoughts && categorizedThoughts.length > 0 && !isLoading && (
               <div className="mt-12">
-                <h2 className="text-3xl font-bold text-center mb-8 font-headline">Your Organized Thoughts</h2>
+                 <div className="flex justify-between items-center mb-8">
+                  <h2 className="text-3xl font-bold text-center font-headline">Your Organized Thoughts</h2>
+                  <Button variant="outline" size="sm" onClick={handleReorganize} disabled={isLoading}>
+                      <RefreshCcw className="w-4 h-4 mr-2" />
+                      Reorganize
+                  </Button>
+                </div>
                 <div className="[column-count:1] md:[column-count:2] lg:[column-count:3] gap-6 space-y-6">
                   {categorizedThoughts.map(({ category, thoughts }, categoryIndex) => (
                     <CategoryDropZone key={category + categoryIndex} categoryIndex={categoryIndex}>
@@ -437,5 +487,7 @@ export default function Home() {
     </div>
   );
 }
+
+    
 
     
