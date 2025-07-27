@@ -437,7 +437,7 @@ export default function Home() {
                               <CardContent className="flex-grow">
                                   <ul className="space-y-3">
                                   {thoughts.map((thought, thoughtIndex) => (
-                                      <li key={`${category}-${categoryIndex}-${thoughtIndex}`} className="flex items-start justify-between gap-2 p-3 rounded-md bg-secondary/50">
+                                      <li key={`${categoryIndex}-${thoughtIndex}`} className="flex items-start justify-between gap-2 p-3 rounded-md bg-secondary/50">
                                       {editingThought?.categoryIndex === categoryIndex && editingThought?.thoughtIndex === thoughtIndex ? (
                                           <div className="flex-grow flex items-center gap-2">
                                             <Textarea
