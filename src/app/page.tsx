@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -74,6 +74,54 @@ export default function Home() {
         useSensor(KeyboardSensor)
     );
 
+    // Load from localStorage on initial render
+    useEffect(() => {
+        try {
+            const savedFullBrainDump = localStorage.getItem('fullBrainDump');
+            const savedCategorizedThoughts = localStorage.getItem('categorizedThoughts');
+
+            if (savedFullBrainDump) {
+                setFullBrainDump(savedFullBrainDump);
+            }
+
+            if (savedCategorizedThoughts) {
+                setCategorizedThoughts(JSON.parse(savedCategorizedThoughts));
+            }
+        } catch (error) {
+            console.error("Failed to load from local storage", error);
+            toast({
+                title: "Could not load saved data",
+                description: "There was an error reading your saved thoughts from local storage.",
+                variant: "destructive",
+            });
+        }
+    }, []);
+
+    // Save to localStorage whenever data changes
+    useEffect(() => {
+        try {
+            if (fullBrainDump) {
+                localStorage.setItem('fullBrainDump', fullBrainDump);
+            } else {
+                localStorage.removeItem('fullBrainDump');
+            }
+            
+            if (categorizedThoughts) {
+                localStorage.setItem('categorizedThoughts', JSON.stringify(categorizedThoughts));
+            } else {
+                localStorage.removeItem('categorizedThoughts');
+            }
+        } catch (error) {
+            console.error("Failed to save to local storage", error);
+            toast({
+                title: "Could not save data",
+                description: "There was an error saving your thoughts to local storage.",
+                variant: "destructive",
+            });
+        }
+    }, [fullBrainDump, categorizedThoughts]);
+
+
   const handleAnalyze = async () => {
     if (!currentBrainDump.trim()) {
         toast({
@@ -138,12 +186,6 @@ export default function Home() {
           description: "Could not generate new categories from your thoughts. Please try again.",
           variant: "destructive",
         });
-        // Restore previous state if reorganization fails to produce categories
-        const { categories: oldCategories } = await categorizeBrainDump({ brainDump: fullBrainDump });
-        if(oldCategories && oldCategories.length > 0) {
-            const { groupedThoughts: oldGroupedThoughts } = await groupThoughtsIntoCategories({ brainDump: fullBrainDump, categories: oldCategories });
-            setCategorizedThoughts(oldGroupedThoughts);
-        }
       }
     } catch (error) {
       console.error(error);
@@ -453,11 +495,11 @@ function EditableThought({ thought, categoryIndex, thoughtIndex, onSave, onCance
                         <PlusSquare className="w-4 h-4 mr-2" />
                         Create
                     </Button>
-                    <Button variant="outline" size="sm" onClick={handleReorganize} disabled={isLoading}>
+                    <Button variant="outline" size="sm" onClick={handleReorganize} disabled={isLoading || !fullBrainDump}>
                         <RefreshCcw className="w-4 h-4 mr-2" />
                         Reorganize
                     </Button>
-                    <Button variant="outline" size="sm" onClick={handleClearAll} disabled={isLoading}>
+                    <Button variant="outline" size="sm" onClick={handleClearAll} disabled={isLoading || !fullBrainDump}>
                         <Trash className="w-4 h-4 mr-2" />
                         All Clear
                     </Button>
@@ -568,3 +610,5 @@ function EditableThought({ thought, categoryIndex, thoughtIndex, onSave, onCance
     </div>
   );
 }
+
+    
