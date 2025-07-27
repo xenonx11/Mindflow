@@ -234,8 +234,8 @@ export default function Home() {
     const { thought, fromCategoryIndex, fromThoughtIndex } = active.data.current;
     const toCategoryIndex = over.data.current?.categoryIndex;
 
-    if (fromCategoryIndex === toCategoryIndex) {
-        return; // No change if dropped in the same category
+    if (fromCategoryIndex === toCategoryIndex || toCategoryIndex === undefined) {
+        return; // No change if dropped in the same category or outside a valid droppable
     }
 
     const newCategorizedThoughts = JSON.parse(JSON.stringify(categorizedThoughts));
@@ -254,14 +254,14 @@ export default function Home() {
   }
 
 
-  function CategoryDropZone({ category, categoryIndex, children }: { category: string; categoryIndex: number; children: React.ReactNode }) {
+  function CategoryDropZone({ categoryIndex, children }: { categoryIndex: number; children: React.ReactNode }) {
     const { setNodeRef, isOver } = useDroppable({
         id: `droppable-category-${categoryIndex}`,
         data: { categoryIndex }
     });
 
     return (
-        <div ref={setNodeRef} className={`rounded-lg ${isOver ? 'bg-accent/80' : ''}`}>
+        <div ref={setNodeRef} className={`rounded-lg h-full ${isOver ? 'bg-accent/80' : ''}`}>
             {children}
         </div>
     );
@@ -319,11 +319,11 @@ export default function Home() {
             {categorizedThoughts && categorizedThoughts.length > 0 && !isLoading && (
               <div className="mt-12">
                 <h2 className="text-3xl font-bold text-center mb-8 font-headline">Your Organized Thoughts</h2>
-                <div className="columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {categorizedThoughts.map(({ category, thoughts }, categoryIndex) => (
-                    <CategoryDropZone key={category + categoryIndex} category={category} categoryIndex={categoryIndex}>
-                        <div className="animate-in fade-in-0 zoom-in-95 duration-500 break-inside-avoid">
-                            <Card className="shadow-lg hover:shadow-xl transition-shadow flex flex-col">
+                    <CategoryDropZone key={category + categoryIndex} categoryIndex={categoryIndex}>
+                        <div className="animate-in fade-in-0 zoom-in-95 duration-500 h-full">
+                            <Card className="shadow-lg hover:shadow-xl transition-shadow flex flex-col h-full">
                               <CardHeader className="flex-row items-center gap-2">
                                   {editingCategory?.categoryIndex === categoryIndex ? (
                                     <div className="flex-grow flex items-center gap-2">
