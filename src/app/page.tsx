@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -9,18 +9,43 @@ import { categorizeBrainDump } from '@/ai/flows/categorize-brain-dump';
 import type { GroupThoughtsIntoCategoriesOutput } from '@/ai/flows/group-thoughts-into-categories';
 import { groupThoughtsIntoCategories } from '@/ai/flows/group-thoughts-into-categories';
 import { transformToChatGPTprompt } from '@/ai/flows/transform-to-chatgpt-prompt';
-import { LoaderCircle, Send, Trash2, BrainCircuit, Edit, Check } from 'lucide-react';
+import { LoaderCircle, Send, Trash2, BrainCircuit, Edit, Check, GripVertical } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Input } from '@/components/ui/input';
 import { ThemeSwitcher } from '@/components/theme-switcher';
+import { DndContext, useDraggable, useDroppable, PointerSensor, KeyboardSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 
 
-type CategorizedThoughts = GroupThoughtsIntoCategoriesOutput;
+type CategorizedThoughts = GroupThoughtsIntoCategoriesOutput['groupedThoughts'];
+
+function DraggableThought({ thought, categoryIndex, thoughtIndex }: { thought: string; categoryIndex: number; thoughtIndex: number; }) {
+    const { attributes, listeners, setNodeRef, transform } = useDraggable({
+        id: `draggable-${categoryIndex}-${thoughtIndex}`,
+        data: { thought, fromCategoryIndex: categoryIndex, fromThoughtIndex: thoughtIndex },
+    });
+
+    const style = transform ? {
+        transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+        zIndex: 100,
+        cursor: 'grabbing',
+    } : undefined;
+
+
+    return (
+        <div ref={setNodeRef} style={style} className="flex items-center w-full">
+            <button {...listeners} {...attributes} className="cursor-grab p-1">
+                <GripVertical className="h-5 w-5 text-muted-foreground" />
+            </button>
+            <div className="flex-grow">{thought}</div>
+        </div>
+    );
+}
+
 
 export default function Home() {
   const [currentBrainDump, setCurrentBrainDump] = useState('');
   const [fullBrainDump, setFullBrainDump] = useState('');
-  const [categorizedThoughts, setCategorizedThoughts] = useState<CategorizedThoughts['groupedThoughts'] | null>(null);
+  const [categorizedThoughts, setCategorizedThoughts] = useState<CategorizedThoughts | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [chatGPTLoadingCard, setChatGPTLoadingCard] = useState<number | null>(null);
   const [chatGPTLoadingThought, setChatGPTLoadingThought] = useState<{categoryIndex: number, thoughtIndex: number} | null>(null);
@@ -28,6 +53,11 @@ export default function Home() {
   const [editingCategory, setEditingCategory] = useState<{categoryIndex: number, text: string} | null>(null);
 
   const { toast } = useToast();
+
+    const sensors = useSensors(
+        useSensor(PointerSensor),
+        useSensor(KeyboardSensor)
+    );
 
   const handleAnalyze = async () => {
     if (!currentBrainDump.trim()) {
@@ -69,7 +99,7 @@ export default function Home() {
     }
   };
 
-  const reGenerateBrainDump = (thoughts: CategorizedThoughts['groupedThoughts']) => {
+  const reGenerateBrainDump = (thoughts: CategorizedThoughts) => {
     return thoughts.map(group => group.thoughts.join('\n')).join('\n');
   }
 
@@ -194,6 +224,49 @@ export default function Home() {
     }
   };
 
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+
+    if (!over || !active.data.current || !categorizedThoughts) {
+        return;
+    }
+
+    const { thought, fromCategoryIndex, fromThoughtIndex } = active.data.current;
+    const toCategoryIndex = over.data.current?.categoryIndex;
+
+    if (fromCategoryIndex === toCategoryIndex) {
+        return; // No change if dropped in the same category
+    }
+
+    const newCategorizedThoughts = JSON.parse(JSON.stringify(categorizedThoughts));
+
+    // Remove from old category
+    newCategorizedThoughts[fromCategoryIndex].thoughts.splice(fromThoughtIndex, 1);
+
+    // Add to new category
+    newCategorizedThoughts[toCategoryIndex].thoughts.push(thought);
+
+    // Clean up empty categories
+    const finalThoughts = newCategorizedThoughts.filter(c => c.thoughts.length > 0);
+
+    setCategorizedThoughts(finalThoughts);
+    setFullBrainDump(reGenerateBrainDump(finalThoughts));
+  }
+
+
+  function CategoryDropZone({ category, categoryIndex, children }: { category: string; categoryIndex: number; children: React.ReactNode }) {
+    const { setNodeRef, isOver } = useDroppable({
+        id: `droppable-category-${categoryIndex}`,
+        data: { categoryIndex }
+    });
+
+    return (
+        <div ref={setNodeRef} className={`rounded-lg ${isOver ? 'bg-accent/80' : ''}`}>
+            {children}
+        </div>
+    );
+}
+
   return (
     <div className="flex flex-col min-h-screen">
       <header className="py-8 bg-background border-b">
@@ -241,115 +314,121 @@ export default function Home() {
                 <LoaderCircle className="w-16 h-16 animate-spin text-primary" />
             </div>
         )}
-
-        {categorizedThoughts && categorizedThoughts.length > 0 && !isLoading && (
-          <div className="mt-12">
-            <h2 className="text-3xl font-bold text-center mb-8 font-headline">Your Organized Thoughts</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {categorizedThoughts.map(({ category, thoughts }, categoryIndex) => (
-                <div key={category + categoryIndex} className="animate-in fade-in-0 zoom-in-95 duration-500">
-                    <Card className="h-full shadow-lg hover:shadow-xl transition-shadow flex flex-col">
-                      <CardHeader className="flex-row items-center gap-2">
-                          {editingCategory?.categoryIndex === categoryIndex ? (
-                            <div className="flex-grow flex items-center gap-2">
-                              <Input 
-                                value={editingCategory.text}
-                                onChange={(e) => setEditingCategory({...editingCategory, text: e.target.value})}
-                                className="flex-grow"
-                              />
-                               <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={handleSaveCategory}>
-                                  <Check className="h-4 w-4 text-green-600" />
-                                  <span className="sr-only">Save category</span>
-                              </Button>
-                            </div>
-                          ) : (
-                            <>
-                              <CardTitle className="capitalize font-headline flex-grow">{category}</CardTitle>
-                               <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => handleSendToChatGPT(categoryIndex)} disabled={chatGPTLoadingCard !== null}>
-                                  {chatGPTLoadingCard === categoryIndex ? (
-                                    <LoaderCircle className="h-4 w-4 animate-spin" />
-                                  ) : (
-                                    <Send className="h-4 w-4 text-muted-foreground hover:text-primary" />
-                                  )}
-                                  <span className="sr-only">Send to ChatGPT</span>
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => handleEditCategory(categoryIndex)}>
-                                  <Edit className="h-4 w-4 text-muted-foreground hover:text-primary" />
-                                  <span className="sr-only">Edit category</span>
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => handleDeleteCategory(categoryIndex)}>
-                                  <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
-                                  <span className="sr-only">Delete category</span>
-                              </Button>
-                            </>
-                          )}
-                      </CardHeader>
-                      <CardContent className="flex-grow">
-                          <ul className="space-y-3">
-                          {thoughts.map((thought, thoughtIndex) => (
-                              <li key={thought + thoughtIndex} className="flex items-start justify-between gap-2 p-3 rounded-md bg-secondary/50">
-                              {editingThought?.categoryIndex === categoryIndex && editingThought?.thoughtIndex === thoughtIndex ? (
-                                  <div className="flex-grow flex items-center gap-2">
-                                    <Textarea
-                                        value={editingThought.text}
-                                        onChange={(e) => setEditingThought({ ...editingThought, text: e.target.value })}
+        
+        <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+            {categorizedThoughts && categorizedThoughts.length > 0 && !isLoading && (
+              <div className="mt-12">
+                <h2 className="text-3xl font-bold text-center mb-8 font-headline">Your Organized Thoughts</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {categorizedThoughts.map(({ category, thoughts }, categoryIndex) => (
+                    <CategoryDropZone key={category + categoryIndex} category={category} categoryIndex={categoryIndex}>
+                        <div className="animate-in fade-in-0 zoom-in-95 duration-500">
+                            <Card className="h-full shadow-lg hover:shadow-xl transition-shadow flex flex-col">
+                              <CardHeader className="flex-row items-center gap-2">
+                                  {editingCategory?.categoryIndex === categoryIndex ? (
+                                    <div className="flex-grow flex items-center gap-2">
+                                      <Input 
+                                        value={editingCategory.text}
+                                        onChange={(e) => setEditingCategory({...editingCategory, text: e.target.value})}
                                         className="flex-grow"
-                                        rows={2}
-                                    />
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={handleSaveThought}>
-                                        <Check className="h-4 w-4 text-green-600" />
-                                        <span className="sr-only">Save thought</span>
-                                    </Button>
-                                  </div>
-                              ) : (
-                                  <>
-                                      <span className="flex-grow">{thought}</span>
-                                      <div className="flex items-center">
-                                          <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-8 w-8 shrink-0"
-                                            onClick={() => handleSendThoughtToChatGPT(categoryIndex, thoughtIndex)}
-                                            disabled={chatGPTLoadingThought !== null}
-                                          >
-                                            {chatGPTLoadingThought?.categoryIndex === categoryIndex && chatGPTLoadingThought?.thoughtIndex === thoughtIndex ? (
-                                              <LoaderCircle className="h-4 w-4 animate-spin" />
-                                            ) : (
-                                              <Send className="h-4 w-4 text-muted-foreground hover:text-primary" />
-                                            )}
-                                            <span className="sr-only">Send thought to ChatGPT</span>
-                                          </Button>
-                                          <Button
-                                              variant="ghost"
-                                              size="icon"
-                                              className="h-8 w-8 shrink-0"
-                                              onClick={() => handleEditThought(categoryIndex, thoughtIndex)}
-                                          >
-                                              <Edit className="h-4 w-4 text-muted-foreground hover:text-primary" />
-                                              <span className="sr-only">Edit thought</span>
-                                          </Button>
-                                          <Button
-                                              variant="ghost"
-                                              size="icon"
-                                              className="h-8 w-8 shrink-0"
-                                              onClick={() => handleDeleteThought(categoryIndex, thoughtIndex)}
-                                          >
-                                              <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
-                                              <span className="sr-only">Delete thought</span>
-                                          </Button>
-                                      </div>
-                                  </>
-                              )}
-                              </li>
-                          ))}
-                          </ul>
-                      </CardContent>
-                    </Card>
+                                      />
+                                       <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={handleSaveCategory}>
+                                          <Check className="h-4 w-4 text-green-600" />
+                                          <span className="sr-only">Save category</span>
+                                      </Button>
+                                    </div>
+                                  ) : (
+                                    <>
+                                      <CardTitle className="capitalize font-headline flex-grow">{category}</CardTitle>
+                                       <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => handleSendToChatGPT(categoryIndex)} disabled={chatGPTLoadingCard !== null}>
+                                          {chatGPTLoadingCard === categoryIndex ? (
+                                            <LoaderCircle className="h-4 w-4 animate-spin" />
+                                          ) : (
+                                            <Send className="h-4 w-4 text-muted-foreground hover:text-primary" />
+                                          )}
+                                          <span className="sr-only">Send to ChatGPT</span>
+                                      </Button>
+                                      <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => handleEditCategory(categoryIndex)}>
+                                          <Edit className="h-4 w-4 text-muted-foreground hover:text-primary" />
+                                          <span className="sr-only">Edit category</span>
+                                      </Button>
+                                      <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => handleDeleteCategory(categoryIndex)}>
+                                          <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+                                          <span className="sr-only">Delete category</span>
+                                      </Button>
+                                    </>
+                                  )}
+                              </CardHeader>
+                              <CardContent className="flex-grow">
+                                  <ul className="space-y-3">
+                                  {thoughts.map((thought, thoughtIndex) => (
+                                      <li key={thought + thoughtIndex} className="flex items-start justify-between gap-2 p-3 rounded-md bg-secondary/50">
+                                      {editingThought?.categoryIndex === categoryIndex && editingThought?.thoughtIndex === thoughtIndex ? (
+                                          <div className="flex-grow flex items-center gap-2">
+                                            <Textarea
+                                                value={editingThought.text}
+                                                onChange={(e) => setEditingThought({ ...editingThought, text: e.target.value })}
+                                                className="flex-grow"
+                                                rows={2}
+                                            />
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={handleSaveThought}>
+                                                <Check className="h-4 w-4 text-green-600" />
+                                                <span className="sr-only">Save thought</span>
+                                            </Button>
+                                          </div>
+                                      ) : (
+                                          <>
+                                              <div className="flex-grow flex items-center">
+                                                <DraggableThought thought={thought} categoryIndex={categoryIndex} thoughtIndex={thoughtIndex} />
+                                              </div>
+                                              <div className="flex items-center">
+                                                  <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-8 w-8 shrink-0"
+                                                    onClick={() => handleSendThoughtToChatGPT(categoryIndex, thoughtIndex)}
+                                                    disabled={chatGPTLoadingThought !== null}
+                                                  >
+                                                    {chatGPTLoadingThought?.categoryIndex === categoryIndex && chatGPTLoadingThought?.thoughtIndex === thoughtIndex ? (
+                                                      <LoaderCircle className="h-4 w-4 animate-spin" />
+                                                    ) : (
+                                                      <Send className="h-4 w-4 text-muted-foreground hover:text-primary" />
+                                                    )}
+                                                    <span className="sr-only">Send thought to ChatGPT</span>
+                                                  </Button>
+                                                  <Button
+                                                      variant="ghost"
+                                                      size="icon"
+                                                      className="h-8 w-8 shrink-0"
+                                                      onClick={() => handleEditThought(categoryIndex, thoughtIndex)}
+                                                  >
+                                                      <Edit className="h-4 w-4 text-muted-foreground hover:text-primary" />
+                                                      <span className="sr-only">Edit thought</span>
+                                                  </Button>
+                                                  <Button
+                                                      variant="ghost"
+                                                      size="icon"
+                                                      className="h-8 w-8 shrink-0"
+                                                      onClick={() => handleDeleteThought(categoryIndex, thoughtIndex)}
+                                                  >
+                                                      <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+                                                      <span className="sr-only">Delete thought</span>
+                                                  </Button>
+                                              </div>
+                                          </>
+                                      )}
+                                      </li>
+                                  ))}
+                                  </ul>
+                              </CardContent>
+                            </Card>
+                        </div>
+                    </CategoryDropZone>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
+              </div>
+            )}
+        </DndContext>
       </main>
 
       <footer className="py-4 text-center text-sm text-muted-foreground border-t bg-background">
@@ -357,3 +436,4 @@ export default function Home() {
       </footer>
     </div>
   );
+}
