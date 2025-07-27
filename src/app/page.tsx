@@ -145,6 +145,7 @@ export default function Home() {
   const handleClearAll = () => {
     setCategorizedThoughts(null);
     setFullBrainDump('');
+    setCurrentBrainDump('');
   };
 
   const handleCreateCard = () => {
@@ -162,13 +163,14 @@ export default function Home() {
   const handleDeleteThought = (categoryIndex: number, thoughtIndex: number) => {
     if (!categorizedThoughts) return;
   
-    const newCategorizedThoughts = JSON.parse(JSON.stringify(categorizedThoughts));
-    
-    newCategorizedThoughts[categoryIndex].thoughts.splice(thoughtIndex, 1);
-  
-    if (newCategorizedThoughts[categoryIndex].thoughts.length === 0) {
-      newCategorizedThoughts.splice(categoryIndex, 1);
-    }
+    const newCategorizedThoughts = categorizedThoughts.map((category, cIndex) => {
+        if (cIndex === categoryIndex) {
+            const newThoughts = [...category.thoughts];
+            newThoughts.splice(thoughtIndex, 1);
+            return { ...category, thoughts: newThoughts };
+        }
+        return category;
+    }).filter(category => category.thoughts.length > 0);
     
     setFullBrainDump(reGenerateBrainDump(newCategorizedThoughts));
 
@@ -190,9 +192,14 @@ export default function Home() {
   
     const { categoryIndex, thoughtIndex, text } = editingThought;
       
-    const newCategorizedThoughts = JSON.parse(JSON.stringify(categorizedThoughts));
-    
-    newCategorizedThoughts[categoryIndex].thoughts[thoughtIndex] = text;
+    const newCategorizedThoughts = categorizedThoughts.map((category, cIndex) => {
+        if (cIndex === categoryIndex) {
+            const newThoughts = [...category.thoughts];
+            newThoughts[thoughtIndex] = text;
+            return { ...category, thoughts: newThoughts };
+        }
+        return category;
+    });
   
     setCategorizedThoughts(newCategorizedThoughts);
     setFullBrainDump(reGenerateBrainDump(newCategorizedThoughts));
@@ -202,8 +209,7 @@ export default function Home() {
   const handleDeleteCategory = (categoryIndex: number) => {
     if (!categorizedThoughts) return;
 
-    const newCategorizedThoughts = JSON.parse(JSON.stringify(categorizedThoughts));
-    newCategorizedThoughts.splice(categoryIndex, 1);
+    const newCategorizedThoughts = categorizedThoughts.filter((_, cIndex) => cIndex !== categoryIndex);
 
     if (newCategorizedThoughts.length === 0) {
         setCategorizedThoughts(null);
@@ -225,8 +231,12 @@ export default function Home() {
 
     const { categoryIndex, text } = editingCategory;
     
-    const newCategorizedThoughts = JSON.parse(JSON.stringify(categorizedThoughts));
-    newCategorizedThoughts[categoryIndex].category = text;
+    const newCategorizedThoughts = categorizedThoughts.map((category, cIndex) => {
+        if (cIndex === categoryIndex) {
+            return { ...category, category: text };
+        }
+        return category;
+    });
 
     setCategorizedThoughts(newCategorizedThoughts);
     setEditingCategory(null);
@@ -293,14 +303,19 @@ export default function Home() {
     if (fromCategoryIndex === toCategoryIndex || toCategoryIndex === undefined) {
         return; // No change if dropped in the same category or outside a valid droppable
     }
-
-    const newCategorizedThoughts = JSON.parse(JSON.stringify(categorizedThoughts));
+    
+    const newCategorizedThoughts = [...categorizedThoughts];
 
     // Remove from old category
-    newCategorizedThoughts[fromCategoryIndex].thoughts.splice(fromThoughtIndex, 1);
+    const sourceCategory = {...newCategorizedThoughts[fromCategoryIndex]};
+    sourceCategory.thoughts = [...sourceCategory.thoughts];
+    sourceCategory.thoughts.splice(fromThoughtIndex, 1);
+    newCategorizedThoughts[fromCategoryIndex] = sourceCategory;
 
     // Add to new category
-    newCategorizedThoughts[toCategoryIndex].thoughts.push(thought);
+    const destinationCategory = {...newCategorizedThoughts[toCategoryIndex]};
+    destinationCategory.thoughts = [...destinationCategory.thoughts, thought];
+    newCategorizedThoughts[toCategoryIndex] = destinationCategory;
 
     // Clean up empty categories
     const finalThoughts = newCategorizedThoughts.filter(c => c.thoughts.length > 0);
@@ -446,6 +461,7 @@ export default function Home() {
                                                 className="flex-grow"
                                                 rows={2}
                                                 autoFocus
+                                                onBlur={handleSaveThought}
                                             />
                                             <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={handleSaveThought}>
                                                 <Check className="h-4 w-4 text-green-600" />
