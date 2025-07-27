@@ -66,7 +66,7 @@ export default function Home() {
   const [user, setUser] = useState<User | null>(null);
   const [currentBrainDump, setCurrentBrainDump] = useState('');
   const [categorizedThoughts, setCategorizedThoughts] = useState<CategorizedThoughts | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [chatGPTLoadingThought, setChatGPTLoadingThought] = useState<{categoryIndex: number, thoughtIndex: number} | null>(null);
   const [editingThought, setEditingThought] = useState<{categoryIndex: number, thoughtIndex: number} | null>(null);
   const [editingCategory, setEditingCategory] = useState<number | null>(null);
@@ -81,12 +81,16 @@ export default function Home() {
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
             setUser(currentUser);
+            if (!currentUser) {
+                setIsLoading(false);
+            }
         });
         return () => unsubscribe();
     }, []);
 
     useEffect(() => {
         if (user) {
+            setIsLoading(true);
             const docRef = doc(db, 'users', user.uid);
             const unsubscribe = onSnapshot(docRef, (docSnap) => {
                 if (docSnap.exists()) {
@@ -95,8 +99,11 @@ export default function Home() {
                 } else {
                     setCategorizedThoughts(null);
                 }
+                setIsLoading(false);
             });
             return () => unsubscribe();
+        } else {
+            setCategorizedThoughts(null);
         }
     }, [user]);
 
@@ -503,7 +510,7 @@ const handleSignOut = async () => {
           </div>
         </div>
         
-        {isLoading && !categorizedThoughts && (
+        {isLoading && (
             <div className="flex justify-center items-center py-20">
                 <LoaderCircle className="w-16 h-16 animate-spin text-primary" />
             </div>
@@ -635,3 +642,5 @@ const handleSignOut = async () => {
     </div>
   );
 }
+
+    
