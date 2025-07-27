@@ -14,9 +14,8 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-const auth = getAuth(app, {
-    popupRedirectResolver: browserPopupRedirectResolver,
-});
+const auth = getAuth(app);
+auth.popupRedirectResolver = browserPopupRedirectResolver;
 
 const db = getFirestore(app);
 
