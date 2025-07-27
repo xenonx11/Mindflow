@@ -9,7 +9,7 @@ import { categorizeBrainDump } from '@/ai/flows/categorize-brain-dump';
 import type { GroupThoughtsIntoCategoriesOutput } from '@/ai/flows/group-thoughts-into-categories';
 import { groupThoughtsIntoCategories } from '@/ai/flows/group-thoughts-into-categories';
 import { transformToChatGPTprompt } from '@/ai/flows/transform-to-chatgpt-prompt';
-import { LoaderCircle, Send, Trash2, BrainCircuit, Edit, Check, GripVertical, RefreshCcw, PlusSquare, Trash } from 'lucide-react';
+import { LoaderCircle, Send, Trash2, BrainCircuit, Edit, Check, GripVertical, RefreshCcw, PlusSquare, Trash, Plus } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Input } from '@/components/ui/input';
 import { ThemeSwitcher } from '@/components/theme-switcher';
@@ -47,7 +47,6 @@ export default function Home() {
   const [fullBrainDump, setFullBrainDump] = useState('');
   const [categorizedThoughts, setCategorizedThoughts] = useState<CategorizedThoughts | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [chatGPTLoadingCard, setChatGPTLoadingCard] = useState<number | null>(null);
   const [chatGPTLoadingThought, setChatGPTLoadingThought] = useState<{categoryIndex: number, thoughtIndex: number} | null>(null);
   const [editingThought, setEditingThought] = useState<{categoryIndex: number, thoughtIndex: number} | null>(null);
   const [editingCategory, setEditingCategory] = useState<number | null>(null);
@@ -155,6 +154,23 @@ export default function Home() {
     setEditingCategory(newCategorizedThoughts.length - 1);
   };
 
+  const handleAddThought = (categoryIndex: number) => {
+    if (!categorizedThoughts) return;
+
+    const newCategorizedThoughts = categorizedThoughts.map((category, cIndex) => {
+      if (cIndex === categoryIndex) {
+        const newThoughts = [...category.thoughts, ''];
+        return { ...category, thoughts: newThoughts };
+      }
+      return category;
+    });
+
+    setCategorizedThoughts(newCategorizedThoughts);
+    setEditingThought({
+      categoryIndex,
+      thoughtIndex: newCategorizedThoughts[categoryIndex].thoughts.length - 1
+    });
+  };
 
   const reGenerateBrainDump = (thoughts: CategorizedThoughts) => {
     return thoughts.map(group => group.thoughts.join('\n')).join('\n');
@@ -234,30 +250,6 @@ export default function Home() {
     setEditingCategory(null);
   }
 
-  const handleSendToChatGPT = async (categoryIndex: number) => {
-    if (!categorizedThoughts) return;
-    setChatGPTLoadingCard(categoryIndex);
-
-    try {
-        const category = categorizedThoughts[categoryIndex];
-        const thoughtsText = category.thoughts.join('\n');
-        if (!thoughtsText.trim()) return;
-
-        const { chatGPTprompt } = await transformToChatGPTprompt({ brainDump: thoughtsText });
-        const url = `https://chat.openai.com/?prompt=${encodeURIComponent(chatGPTprompt)}`;
-        window.open(url, '_blank');
-    } catch (error) {
-        console.error(error);
-        toast({
-            title: "Error creating prompt",
-            description: "Failed to generate a prompt for ChatGPT. Please try again.",
-            variant: "destructive",
-        });
-    } finally {
-        setChatGPTLoadingCard(null);
-    }
-  };
-
   const handleSendThoughtToChatGPT = async (categoryIndex: number, thoughtIndex: number) => {
     if (!categorizedThoughts) return;
     setChatGPTLoadingThought({ categoryIndex, thoughtIndex });
@@ -330,7 +322,7 @@ export default function Home() {
 }
 
 // Sub-component for editing a category title
-function EditableCategoryTitle({ category, categoryIndex, onSave, onCancel, onSendToChatGPT, onDelete, onEdit, chatGPTLoadingCard }) {
+function EditableCategoryTitle({ category, categoryIndex, onSave, onCancel }) {
     const [text, setText] = useState(category.category);
 
     const handleSave = () => {
@@ -468,21 +460,13 @@ function EditableThought({ thought, categoryIndex, thoughtIndex, onSave, onCance
                                         categoryIndex={categoryIndex}
                                         onSave={handleSaveCategory}
                                         onCancel={() => setEditingCategory(null)}
-                                        onSendToChatGPT={handleSendToChatGPT}
-                                        onDelete={handleDeleteCategory}
-                                        onEdit={handleEditCategory}
-                                        chatGPTLoadingCard={chatGPTLoadingCard}
                                         />
                                     ) : (
                                         <>
                                         <CardTitle className="capitalize font-headline flex-grow">{card.category}</CardTitle>
-                                        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => handleSendToChatGPT(categoryIndex)} disabled={chatGPTLoadingCard !== null}>
-                                            {chatGPTLoadingCard === categoryIndex ? (
-                                                <LoaderCircle className="h-4 w-4 animate-spin" />
-                                            ) : (
-                                                <Send className="h-4 w-4 text-muted-foreground hover:text-primary" />
-                                            )}
-                                            <span className="sr-only">Send to ChatGPT</span>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => handleAddThought(categoryIndex)}>
+                                            <Plus className="h-4 w-4 text-muted-foreground hover:text-primary" />
+                                            <span className="sr-only">Add thought</span>
                                         </Button>
                                         <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => handleEditCategory(categoryIndex)}>
                                             <Edit className="h-4 w-4 text-muted-foreground hover:text-primary" />
