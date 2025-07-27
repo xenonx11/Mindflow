@@ -19,8 +19,6 @@ const auth = getAuth(app, {
     popupRedirectResolver: browserPopupRedirectResolver,
 });
 
-auth.tenantId = '__';
-
 const db = getFirestore(app);
 
 export { app, auth, db };
