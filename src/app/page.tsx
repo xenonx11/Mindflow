@@ -9,7 +9,7 @@ import { categorizeBrainDump } from '@/ai/flows/categorize-brain-dump';
 import type { GroupThoughtsIntoCategoriesOutput } from '@/ai/flows/group-thoughts-into-categories';
 import { groupThoughtsIntoCategories } from '@/ai/flows/group-thoughts-into-categories';
 import { transformToChatGPTprompt } from '@/ai/flows/transform-to-chatgpt-prompt';
-import { LoaderCircle, Send, Trash2, BrainCircuit, Edit, Check, GripVertical, RefreshCcw } from 'lucide-react';
+import { LoaderCircle, Send, Trash2, BrainCircuit, Edit, Check, GripVertical, RefreshCcw, PlusSquare, Trash } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Input } from '@/components/ui/input';
 import { ThemeSwitcher } from '@/components/theme-switcher';
@@ -140,6 +140,18 @@ export default function Home() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleClearAll = () => {
+    setCategorizedThoughts(null);
+    setFullBrainDump('');
+  };
+
+  const handleCreateCard = () => {
+    const newCard = { category: 'New Category', thoughts: [] };
+    const newCategorizedThoughts = categorizedThoughts ? [...categorizedThoughts, newCard] : [newCard];
+    setCategorizedThoughts(newCategorizedThoughts);
+    setEditingCategory({ categoryIndex: newCategorizedThoughts.length - 1, text: 'New Category' });
   };
 
 
@@ -353,7 +365,7 @@ export default function Home() {
           </div>
         </div>
         
-        {isLoading && (
+        {isLoading && !categorizedThoughts && (
             <div className="flex justify-center items-center py-20">
                 <LoaderCircle className="w-16 h-16 animate-spin text-primary" />
             </div>
@@ -364,10 +376,20 @@ export default function Home() {
               <div className="mt-12">
                  <div className="flex justify-between items-center mb-8">
                   <h2 className="text-3xl font-bold text-center font-headline">Your Organized Thoughts</h2>
-                  <Button variant="outline" size="sm" onClick={handleReorganize} disabled={isLoading}>
-                      <RefreshCcw className="w-4 h-4 mr-2" />
-                      Reorganize
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={handleCreateCard} disabled={isLoading}>
+                        <PlusSquare className="w-4 h-4 mr-2" />
+                        Create
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={handleReorganize} disabled={isLoading}>
+                        <RefreshCcw className="w-4 h-4 mr-2" />
+                        Reorganize
+                    </Button>
+                     <Button variant="outline" size="sm" onClick={handleClearAll} disabled={isLoading}>
+                        <Trash className="w-4 h-4 mr-2" />
+                        All Clear
+                    </Button>
+                  </div>
                 </div>
                 <div className="[column-count:1] md:[column-count:2] lg:[column-count:3] gap-6 space-y-6">
                   {categorizedThoughts.map(({ category, thoughts }, categoryIndex) => (
@@ -381,6 +403,9 @@ export default function Home() {
                                         value={editingCategory.text}
                                         onChange={(e) => setEditingCategory({...editingCategory, text: e.target.value})}
                                         className="flex-grow"
+                                        autoFocus
+                                        onBlur={handleSaveCategory}
+                                        onKeyDown={(e) => e.key === 'Enter' && handleSaveCategory()}
                                       />
                                        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={handleSaveCategory}>
                                           <Check className="h-4 w-4 text-green-600" />
@@ -412,7 +437,7 @@ export default function Home() {
                               <CardContent className="flex-grow">
                                   <ul className="space-y-3">
                                   {thoughts.map((thought, thoughtIndex) => (
-                                      <li key={`${categoryIndex}-${thoughtIndex}`} className="flex items-start justify-between gap-2 p-3 rounded-md bg-secondary/50">
+                                      <li key={`${category}-${categoryIndex}-${thoughtIndex}`} className="flex items-start justify-between gap-2 p-3 rounded-md bg-secondary/50">
                                       {editingThought?.categoryIndex === categoryIndex && editingThought?.thoughtIndex === thoughtIndex ? (
                                           <div className="flex-grow flex items-center gap-2">
                                             <Textarea
@@ -420,6 +445,7 @@ export default function Home() {
                                                 onChange={(e) => setEditingThought({ ...editingThought, text: e.target.value })}
                                                 className="flex-grow"
                                                 rows={2}
+                                                autoFocus
                                             />
                                             <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={handleSaveThought}>
                                                 <Check className="h-4 w-4 text-green-600" />
@@ -486,4 +512,5 @@ export default function Home() {
       </footer>
     </div>
   );
-}
+
+    
