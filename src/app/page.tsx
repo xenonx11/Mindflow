@@ -478,7 +478,7 @@ export default function Home() {
     } finally {
       setIsLoading(false);
     }
-  }, [categorizedThoughts]);
+  }, [categorizedThoughts, toast]);
 
   const handleClearAll = useCallback(() => {
     if (audioRef.current) {
@@ -852,7 +852,7 @@ export default function Home() {
                 </div>
                 </div>
                 {categorizedThoughts && categorizedThoughts.length > 0 && (
-                    <div className="space-y-6 md:space-y-0 md:grid md:grid-cols-2 lg:grid-cols-3 md:gap-6">
+                    <div className="space-y-6 md:columns-2 lg:columns-3 md:gap-6 md:space-y-6">
                     {categorizedThoughts.map((card, categoryIndex) => (
                         <CategoryDropZone key={`${card.category}-${categoryIndex}`} categoryIndex={categoryIndex}>
                             <ThoughtCategoryCard
