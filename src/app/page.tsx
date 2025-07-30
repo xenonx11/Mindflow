@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -9,15 +9,28 @@ import { categorizeBrainDump } from '@/ai/flows/categorize-brain-dump';
 import type { GroupThoughtsIntoCategoriesOutput } from '@/ai/flows/group-thoughts-into-categories';
 import { groupThoughtsIntoCategories } from '@/ai/flows/group-thoughts-into-categories';
 import { transformToChatGPTprompt } from '@/ai/flows/transform-to-chatgpt-prompt';
-import { LoaderCircle, Send, Trash2, BrainCircuit, Edit, Check, RefreshCcw, PlusSquare, Trash, Plus } from 'lucide-react';
+import { categorizeAudioNote } from '@/ai/flows/categorize-audio-note';
+import { LoaderCircle, Send, Trash2, BrainCircuit, Edit, Check, RefreshCcw, PlusSquare, Trash, Plus, Mic, Square, Play, Pause } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Input } from '@/components/ui/input';
 import { ThemeSwitcher } from '@/components/theme-switcher';
 import { DndContext, useDraggable, useDroppable, PointerSensor, KeyboardSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 
-type CategorizedThoughts = GroupThoughtsIntoCategoriesOutput['groupedThoughts'];
+type Thought = {
+    id: string;
+    type: 'text' | 'audio';
+    content: string;
+    transcription?: string;
+};
 
-function DraggableThought({ thought, categoryIndex, thoughtIndex }: { thought: string; categoryIndex: number; thoughtIndex: number; }) {
+type CategorizedThoughtGroup = {
+    category: string;
+    thoughts: Thought[];
+};
+
+type CategorizedThoughts = CategorizedThoughtGroup[];
+
+const DraggableThought = React.memo(({ thought, categoryIndex, thoughtIndex }: { thought: Thought; categoryIndex: number; thoughtIndex: number; }) => {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: `draggable-${categoryIndex}-${thoughtIndex}`,
         data: { thought, fromCategoryIndex: categoryIndex, fromThoughtIndex: thoughtIndex },
@@ -28,7 +41,6 @@ function DraggableThought({ thought, categoryIndex, thoughtIndex }: { thought: s
         zIndex: 100,
         cursor: 'grabbing',
     } : undefined;
-
 
     return (
         <div ref={setNodeRef} style={style} className="flex items-center w-full">
@@ -51,19 +63,28 @@ function DraggableThought({ thought, categoryIndex, thoughtIndex }: { thought: s
                     <circle cx="15" cy="15" r="1" />
                 </svg>
             </button>
-            <div className="flex-grow">{thought}</div>
+            <div className="flex-grow">{thought.type === 'text' ? thought.content : (thought.transcription || 'Audio Note')}</div>
         </div>
     );
-}
+});
+DraggableThought.displayName = 'DraggableThought';
 
 
 export default function Home() {
   const [currentBrainDump, setCurrentBrainDump] = useState('');
   const [categorizedThoughts, setCategorizedThoughts] = useState<CategorizedThoughts | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [chatGPTLoadingThought, setChatGPTLoadingThought] = useState<{categoryIndex: number, thoughtIndex: number} | null>(null);
+  const [loadingText, setLoadingText] = useState('Analyzing...');
+  const [chatGPTLoadingThought, setChatGPTLoadingThought] = useState<string | null>(null);
   const [editingThought, setEditingThought] = useState<{categoryIndex: number, thoughtIndex: number} | null>(null);
   const [editingCategory, setEditingCategory] = useState<number | null>(null);
+  
+  const [isRecording, setIsRecording] = useState(false);
+  const [audioURL, setAudioURL] = useState('');
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
 
   const { toast } = useToast();
 
@@ -90,48 +111,104 @@ export default function Home() {
 
     const reGenerateBrainDumpFromThoughts = (thoughts: CategorizedThoughts | null) => {
         if (!thoughts) return '';
-        return thoughts.map(group => group.thoughts.join('\n')).join('\n');
+        return thoughts.map(group => group.thoughts.filter(t => t.type === 'text').map(t => t.content).join('\n')).join('\n');
     }
 
-  const handleAnalyze = async () => {
-    if (!currentBrainDump.trim()) {
-        toast({
-            title: "Input is empty",
-            description: "Please enter some thoughts to analyze.",
-            variant: "destructive",
-        })
-        return;
-    }
-
-    setIsLoading(true);
+    const loadingMessages = [
+        "Reading thoughts...",
+        "Untangling each thread...",
+        "Creating perfect categories...",
+        "Almost there...",
+    ];
     
-    const existingBrainDump = reGenerateBrainDumpFromThoughts(categorizedThoughts);
-    const newFullBrainDump = existingBrainDump ? `${existingBrainDump}\n${currentBrainDump}` : currentBrainDump;
+    useEffect(() => {
+        let interval: NodeJS.Timeout;
+        if (isLoading) {
+            let i = 0;
+            setLoadingText(loadingMessages[i]);
+            interval = setInterval(() => {
+                i = (i + 1) % loadingMessages.length;
+                setLoadingText(loadingMessages[i]);
+            }, 2000);
+        }
+        return () => {
+            if (interval) {
+                clearInterval(interval)
+            }
+        };
+    }, [isLoading]);
 
-    try {
-      const { categories } = await categorizeBrainDump({ brainDump: newFullBrainDump });
-      if (categories && categories.length > 0) {
-        const { groupedThoughts } = await groupThoughtsIntoCategories({ brainDump: newFullBrainDump, categories });
-        updateLocalStorage(groupedThoughts);
-        setCurrentBrainDump(''); // Clear the input textarea
-      } else {
-        toast({
-            title: "Analysis Error",
-            description: "Could not generate categories from your input. Please try again with different text.",
+    const handleAnalyze = async () => {
+        if (!currentBrainDump.trim()) {
+            toast({
+                title: "Input is empty",
+                description: "Please enter some thoughts to analyze.",
+                variant: "destructive",
+            })
+            return;
+        }
+    
+        setIsLoading(true);
+        
+        const existingBrainDump = reGenerateBrainDumpFromThoughts(categorizedThoughts);
+        const newFullBrainDump = existingBrainDump ? `${existingBrainDump}\n${currentBrainDump}` : currentBrainDump;
+    
+        try {
+          const { categories } = await categorizeBrainDump({ brainDump: newFullBrainDump });
+          if (categories && categories.length > 0) {
+            const { groupedThoughts: rawGroupedThoughts } = await groupThoughtsIntoCategories({ brainDump: newFullBrainDump, categories });
+            
+            const groupedThoughts: CategorizedThoughts = rawGroupedThoughts.map(group => ({
+                category: group.category,
+                thoughts: group.thoughts.map(thoughtText => ({
+                    id: crypto.randomUUID(),
+                    type: 'text',
+                    content: thoughtText,
+                }))
+            }));
+
+            // This part is tricky. We need to merge existing audio notes.
+            if(categorizedThoughts) {
+                const audioThoughtsByCategory = new Map<string, Thought[]>();
+                categorizedThoughts.forEach(group => {
+                    group.thoughts.forEach(thought => {
+                        if (thought.type === 'audio') {
+                            if (!audioThoughtsByCategory.has(group.category)) {
+                                audioThoughtsByCategory.set(group.category, []);
+                            }
+                            audioThoughtsByCategory.get(group.category)!.push(thought);
+                        }
+                    });
+                });
+                
+                groupedThoughts.forEach(group => {
+                    if (audioThoughtsByCategory.has(group.category)) {
+                        group.thoughts.push(...audioThoughtsByCategory.get(group.category)!);
+                    }
+                });
+            }
+
+
+            updateLocalStorage(groupedThoughts);
+            setCurrentBrainDump('');
+          } else {
+            toast({
+                title: "Analysis Error",
+                description: "Could not generate categories from your input. Please try again with different text.",
+                variant: "destructive",
+            })
+          }
+        } catch (error) {
+          console.error(error);
+          toast({
+            title: "An unexpected error occurred",
+            description: "Failed to analyze thoughts. Please try again later.",
             variant: "destructive",
-        })
-      }
-    } catch (error) {
-      console.error(error);
-      toast({
-        title: "An unexpected error occurred",
-        description: "Failed to analyze thoughts. Please try again later.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false);
-    }
-  };
+          })
+        } finally {
+          setIsLoading(false);
+        }
+      };
 
   const handleReorganize = async () => {
     const fullBrainDump = reGenerateBrainDumpFromThoughts(categorizedThoughts);
@@ -149,8 +226,40 @@ export default function Home() {
     try {
       const { categories } = await categorizeBrainDump({ brainDump: fullBrainDump });
       if (categories && categories.length > 0) {
-        const { groupedThoughts } = await groupThoughtsIntoCategories({ brainDump: fullBrainDump, categories });
+        const { groupedThoughts: rawGroupedThoughts } = await groupThoughtsIntoCategories({ brainDump: fullBrainDump, categories });
+        
+        const groupedThoughts: CategorizedThoughts = rawGroupedThoughts.map(group => ({
+            category: group.category,
+            thoughts: group.thoughts.map(thoughtText => ({
+                id: crypto.randomUUID(),
+                type: 'text',
+                content: thoughtText,
+            }))
+        }));
+
+        if(categorizedThoughts) {
+            const audioThoughtsByCategory = new Map<string, Thought[]>();
+            categorizedThoughts.forEach(group => {
+                group.thoughts.forEach(thought => {
+                    if (thought.type === 'audio') {
+                        if (!audioThoughtsByCategory.has(group.category)) {
+                            audioThoughtsByCategory.set(group.category, []);
+                        }
+                        audioThoughtsByCategory.get(group.category)!.push(thought);
+                    }
+                });
+            });
+            
+            groupedThoughts.forEach(group => {
+                if (audioThoughtsByCategory.has(group.category)) {
+                    group.thoughts.push(...audioThoughtsByCategory.get(group.category)!);
+                }
+            });
+        }
+
+
         updateLocalStorage(groupedThoughts);
+
       } else {
         toast({
           title: "Reorganization Error",
@@ -187,7 +296,8 @@ export default function Home() {
 
     const newCategorizedThoughts = categorizedThoughts.map((category, cIndex) => {
       if (cIndex === categoryIndex) {
-        const newThoughts = [...category.thoughts, ''];
+        const newThought: Thought = { id: crypto.randomUUID(), type: 'text', content: ''};
+        const newThoughts = [...category.thoughts, newThought];
         return { ...category, thoughts: newThoughts };
       }
       return category;
@@ -200,24 +310,24 @@ export default function Home() {
     });
   };
 
-  const handleDeleteThought = (categoryIndex: number, thoughtIndex: number) => {
-    if (!categorizedThoughts) return;
-  
-    const newCategorizedThoughts = categorizedThoughts.map((category, cIndex) => {
-        if (cIndex === categoryIndex) {
-            const newThoughts = [...category.thoughts];
-            newThoughts.splice(thoughtIndex, 1);
-            return { ...category, thoughts: newThoughts };
-        }
-        return category;
-    }).filter(category => category.thoughts.length > 0);
+    const handleDeleteThought = (categoryIndex: number, thoughtIndex: number) => {
+        if (!categorizedThoughts) return;
     
-    if (newCategorizedThoughts.length === 0) {
-      updateLocalStorage(null);
-    } else {
-      updateLocalStorage(newCategorizedThoughts);
-    }
-  };
+        const newCategorizedThoughts = categorizedThoughts.map((category, cIndex) => {
+            if (cIndex === categoryIndex) {
+                const newThoughts = [...category.thoughts];
+                newThoughts.splice(thoughtIndex, 1);
+                return { ...category, thoughts: newThoughts };
+            }
+            return category;
+        }).filter(category => category.thoughts.length > 0);
+        
+        if (newCategorizedThoughts.length === 0) {
+            updateLocalStorage(null);
+        } else {
+            updateLocalStorage(newCategorizedThoughts);
+        }
+    };
 
   const handleEditThought = (categoryIndex: number, thoughtIndex: number) => {
     setEditingThought({ categoryIndex, thoughtIndex });
@@ -229,7 +339,8 @@ export default function Home() {
     const newCategorizedThoughts = categorizedThoughts.map((category, cIndex) => {
         if (cIndex === categoryIndex) {
             const newThoughts = [...category.thoughts];
-            newThoughts[thoughtIndex] = newText;
+            const thoughtToUpdate = { ...newThoughts[thoughtIndex], content: newText };
+            newThoughts[thoughtIndex] = thoughtToUpdate;
             return { ...category, thoughts: newThoughts };
         }
         return category;
@@ -269,15 +380,15 @@ export default function Home() {
     setEditingCategory(null);
   }
 
-  const handleSendThoughtToChatGPT = async (categoryIndex: number, thoughtIndex: number) => {
-    if (!categorizedThoughts) return;
-    setChatGPTLoadingThought({ categoryIndex, thoughtIndex });
+  const handleSendThoughtToChatGPT = async (thought: Thought) => {
+    if (!thought.content) return;
+    setChatGPTLoadingThought(thought.id);
 
     try {
-      const thoughtText = categorizedThoughts[categoryIndex].thoughts[thoughtIndex];
-      if (!thoughtText.trim()) return;
+      const textToSend = thought.type === 'text' ? thought.content : (thought.transcription || '');
+      if (!textToSend.trim()) return;
 
-      const { chatGPTprompt } = await transformToChatGPTprompt({ brainDump: thoughtText });
+      const { chatGPTprompt } = await transformToChatGPTprompt({ brainDump: textToSend });
       const url = `https://chat.openai.com/?prompt=${encodeURIComponent(chatGPTprompt)}`;
       window.open(url, '_blank');
     } catch (error) {
@@ -288,40 +399,137 @@ export default function Home() {
         variant: "destructive",
       });
     } finally {
-      setChatGPTLoadingThought(null);
+        setChatGPTLoadingThought(null);
     }
   };
 
-  function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event;
-
-    if (!over || !active.data.current || !categorizedThoughts) {
-        return;
-    }
-
-    const { thought, fromCategoryIndex, fromThoughtIndex } = active.data.current;
-    const toCategoryIndex = over.data.current?.categoryIndex;
-
-    if (fromCategoryIndex === toCategoryIndex || toCategoryIndex === undefined) {
-        return; 
-    }
+    function handleDragEnd(event: DragEndEvent) {
+        const { active, over } = event;
     
-    const newCategorizedThoughts = [...categorizedThoughts];
+        if (!over || !active.data.current || !categorizedThoughts) {
+            return;
+        }
+    
+        const { thought, fromCategoryIndex, fromThoughtIndex } = active.data.current as { thought: Thought; fromCategoryIndex: number; fromThoughtIndex: number; };
+        const toCategoryIndex = over.data.current?.categoryIndex;
+    
+        if (fromCategoryIndex === toCategoryIndex || toCategoryIndex === undefined) {
+            return; 
+        }
+        
+        const newCategorizedThoughts = [...categorizedThoughts];
+    
+        const sourceCategory = {...newCategorizedThoughts[fromCategoryIndex]};
+        sourceCategory.thoughts = [...sourceCategory.thoughts];
+        sourceCategory.thoughts.splice(fromThoughtIndex, 1);
+        newCategorizedThoughts[fromCategoryIndex] = sourceCategory;
+    
+        const destinationCategory = {...newCategorizedThoughts[toCategoryIndex]};
+        destinationCategory.thoughts = [...destinationCategory.thoughts, thought];
+        newCategorizedThoughts[toCategoryIndex] = destinationCategory;
+    
+        const finalThoughts = newCategorizedThoughts.filter(c => c.thoughts.length > 0);
+    
+        updateLocalStorage(finalThoughts);
+    }
 
-    const sourceCategory = {...newCategorizedThoughts[fromCategoryIndex]};
-    sourceCategory.thoughts = [...sourceCategory.thoughts];
-    sourceCategory.thoughts.splice(fromThoughtIndex, 1);
-    newCategorizedThoughts[fromCategoryIndex] = sourceCategory;
+    const startRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const mediaRecorder = new MediaRecorder(stream);
+            mediaRecorderRef.current = mediaRecorder;
+            const audioChunks: Blob[] = [];
+    
+            mediaRecorder.ondataavailable = (event) => {
+                audioChunks.push(event.data);
+            };
+    
+            mediaRecorder.onstop = async () => {
+                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                const reader = new FileReader();
+                reader.readAsDataURL(audioBlob);
+                reader.onloadend = async () => {
+                    const base64Audio = reader.result as string;
+                    handleAudioCategorization(base64Audio);
+                };
+            };
+    
+            mediaRecorder.start();
+            setIsRecording(true);
+        } catch (error) {
+            console.error("Error accessing microphone:", error);
+            toast({
+                title: "Microphone Access Denied",
+                description: "Please enable microphone permissions in your browser settings.",
+                variant: "destructive",
+            });
+        }
+    };
+    
+    const stopRecording = () => {
+        if (mediaRecorderRef.current) {
+            mediaRecorderRef.current.stop();
+            setIsRecording(false);
+        }
+    };
+    
+    const handleAudioCategorization = async (audioDataUri: string) => {
+        setIsLoading(true);
+        setLoadingText("Analyzing audio...");
+        try {
+            const existingCategories = categorizedThoughts?.map(c => c.category) || [];
+            const { category, transcription } = await categorizeAudioNote({
+                audio: audioDataUri,
+                existingCategories,
+            });
+    
+            const newThought: Thought = {
+                id: crypto.randomUUID(),
+                type: 'audio',
+                content: audioDataUri,
+                transcription: transcription,
+            };
+    
+            let newCategorizedThoughts = [...(categorizedThoughts || [])];
+            let categoryIndex = newCategorizedThoughts.findIndex(g => g.category.toLowerCase() === category.toLowerCase());
+    
+            if (categoryIndex === -1) {
+                newCategorizedThoughts.push({ category: category, thoughts: [newThought] });
+            } else {
+                newCategorizedThoughts[categoryIndex].thoughts.push(newThought);
+            }
+    
+            updateLocalStorage(newCategorizedThoughts);
+        } catch (error) {
+            console.error(error);
+            toast({
+                title: "Audio Analysis Error",
+                description: "Failed to categorize the audio note. Please try again.",
+                variant: "destructive",
+            });
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
-    const destinationCategory = {...newCategorizedThoughts[toCategoryIndex]};
-    destinationCategory.thoughts = [...destinationCategory.thoughts, thought];
-    newCategorizedThoughts[toCategoryIndex] = destinationCategory;
-
-    const finalThoughts = newCategorizedThoughts.filter(c => c.thoughts.length > 0);
-
-    updateLocalStorage(finalThoughts);
-  }
-
+    const togglePlayPause = (thought: Thought) => {
+        if (playingAudioId === thought.id && audioRef.current) {
+            audioRef.current.pause();
+            setPlayingAudioId(null);
+        } else {
+            if (audioRef.current) {
+                audioRef.current.pause();
+            }
+            const newAudio = new Audio(thought.content);
+            audioRef.current = newAudio;
+            newAudio.play();
+            setPlayingAudioId(thought.id);
+            newAudio.onended = () => {
+                setPlayingAudioId(null);
+            };
+        }
+    };
+  
 
   function CategoryDropZone({ categoryIndex, children }: { categoryIndex: number; children: React.ReactNode }) {
     const { setNodeRef, isOver } = useDroppable({
@@ -365,7 +573,7 @@ function EditableCategoryTitle({ category, categoryIndex, onSave, onCancel }) {
 }
 
 function EditableThought({ thought, categoryIndex, thoughtIndex, onSave, onCancel }) {
-    const [text, setText] = useState(thought);
+    const [text, setText] = useState(thought.content);
     
     const handleSave = () => {
         onSave(categoryIndex, thoughtIndex, text);
@@ -427,19 +635,33 @@ function EditableThought({ thought, categoryIndex, thoughtIndex, onSave, onCance
               rows={10}
             />
             <div className="flex flex-col sm:flex-row gap-2">
-              <Button onClick={handleAnalyze} disabled={isLoading} className="flex-1 text-lg py-6">
+              <Button onClick={handleAnalyze} disabled={isLoading || isRecording} className="flex-1 text-lg py-6">
                 {isLoading ? (
-                  <LoaderCircle className="animate-spin mr-2" />
-                ) : null}
-                {isLoading ? 'Analyzing...' : 'Untangle Thoughts'}
+                  <>
+                    <LoaderCircle className="animate-spin mr-2" />
+                    {loadingText}
+                  </>
+                ) : 'Untangle Thoughts'}
+              </Button>
+              <Button onClick={isRecording ? stopRecording : startRecording} disabled={isLoading} className="text-lg py-6" variant={isRecording ? 'destructive' : 'outline'}>
+                {isRecording ? (
+                    <>
+                        <Square className="mr-2" /> Stop
+                    </>
+                ) : (
+                    <>
+                        <Mic className="mr-2" /> Record
+                    </>
+                )}
               </Button>
             </div>
           </div>
         </div>
         
         {isLoading && !categorizedThoughts && (
-            <div className="flex justify-center items-center py-20">
+            <div className="flex flex-col justify-center items-center py-20">
                 <LoaderCircle className="w-16 h-16 animate-spin text-primary" />
+                <p className="mt-4 text-lg text-muted-foreground">{loadingText}</p>
             </div>
         )}
         
@@ -462,7 +684,7 @@ function EditableThought({ thought, categoryIndex, thoughtIndex, onSave, onCance
                     </Button>
                 </div>
                 </div>
-                {categorizedThoughts && categorizedThoughts.length > 0 && !isLoading && (
+                {categorizedThoughts && categorizedThoughts.length > 0 && (
                     <div className="[column-count:1] md:[column-count:2] lg:[column-count:3] gap-6 space-y-6">
                     {categorizedThoughts.map((card, categoryIndex) => (
                         <CategoryDropZone key={`${card.category}-${categoryIndex}`} categoryIndex={categoryIndex}>
@@ -497,7 +719,7 @@ function EditableThought({ thought, categoryIndex, thoughtIndex, onSave, onCance
                                 <CardContent className="flex-grow">
                                     <ul className="space-y-3">
                                     {card.thoughts.map((thought, thoughtIndex) => (
-                                        <li key={`${categoryIndex}-${thoughtIndex}`} className="flex items-start justify-between gap-2 p-3 rounded-md bg-secondary/50">
+                                        <li key={thought.id} className="flex items-start justify-between gap-2 p-3 rounded-md bg-secondary/50">
                                         {editingThought?.categoryIndex === categoryIndex && editingThought?.thoughtIndex === thoughtIndex ? (
                                             <EditableThought
                                                 thought={thought}
@@ -508,33 +730,47 @@ function EditableThought({ thought, categoryIndex, thoughtIndex, onSave, onCance
                                             />
                                         ) : (
                                             <>
-                                                <div className="flex-grow flex items-center">
-                                                    <DraggableThought thought={thought} categoryIndex={categoryIndex} thoughtIndex={thoughtIndex} />
-                                                </div>
+                                                {thought.type === 'text' ? (
+                                                    <div className="flex-grow flex items-center">
+                                                        <DraggableThought thought={thought} categoryIndex={categoryIndex} thoughtIndex={thoughtIndex} />
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex-grow flex items-center gap-2">
+                                                        <Button variant="ghost" size="icon" onClick={() => togglePlayPause(thought)}>
+                                                            {playingAudioId === thought.id ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+                                                        </Button>
+                                                        <div className="flex-grow text-sm italic">{thought.transcription || 'Audio Note'}</div>
+                                                    </div>
+                                                )}
+
                                                 <div className="flex items-center">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-8 w-8 shrink-0"
-                                                        onClick={() => handleSendThoughtToChatGPT(categoryIndex, thoughtIndex)}
-                                                        disabled={chatGPTLoadingThought !== null}
-                                                    >
-                                                        {chatGPTLoadingThought?.categoryIndex === categoryIndex && chatGPTLoadingThought?.thoughtIndex === thoughtIndex ? (
-                                                        <LoaderCircle className="h-4 w-4 animate-spin" />
-                                                        ) : (
-                                                        <Send className="h-4 w-4 text-muted-foreground hover:text-primary" />
-                                                        )}
-                                                        <span className="sr-only">Send thought to ChatGPT</span>
-                                                    </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-8 w-8 shrink-0"
-                                                        onClick={() => handleEditThought(categoryIndex, thoughtIndex)}
-                                                    >
-                                                        <Edit className="h-4 w-4 text-muted-foreground hover:text-primary" />
-                                                        <span className="sr-only">Edit thought</span>
-                                                    </Button>
+                                                    {thought.type === 'text' && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-8 w-8 shrink-0"
+                                                            onClick={() => handleSendThoughtToChatGPT(thought)}
+                                                            disabled={chatGPTLoadingThought !== null}
+                                                        >
+                                                            {chatGPTLoadingThought === thought.id ? (
+                                                            <LoaderCircle className="h-4 w-4 animate-spin" />
+                                                            ) : (
+                                                            <Send className="h-4 w-4 text-muted-foreground hover:text-primary" />
+                                                            )}
+                                                            <span className="sr-only">Send thought to ChatGPT</span>
+                                                        </Button>
+                                                    )}
+                                                    {thought.type === 'text' && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-8 w-8 shrink-0"
+                                                            onClick={() => handleEditThought(categoryIndex, thoughtIndex)}
+                                                        >
+                                                            <Edit className="h-4 w-4 text-muted-foreground hover:text-primary" />
+                                                            <span className="sr-only">Edit thought</span>
+                                                        </Button>
+                                                    )}
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
