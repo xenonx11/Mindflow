@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -10,7 +10,7 @@ import type { GroupThoughtsIntoCategoriesOutput } from '@/ai/flows/group-thought
 import { groupThoughtsIntoCategories } from '@/ai/flows/group-thoughts-into-categories';
 import { transformToChatGPTprompt } from '@/ai/flows/transform-to-chatgpt-prompt';
 import { categorizeAudioNote } from '@/ai/flows/categorize-audio-note';
-import { LoaderCircle, Send, Trash2, BrainCircuit, Edit, Check, RefreshCcw, PlusSquare, Trash, Plus, Mic, Square, Play, Pause } from 'lucide-react';
+import { LoaderCircle, Send, Trash2, BrainCircuit, Edit, Check, RefreshCcw, PlusSquare, Trash, Plus, Mic, Square, Play, Pause, X } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Input } from '@/components/ui/input';
 import { ThemeSwitcher } from '@/components/theme-switcher';
@@ -157,6 +157,10 @@ function EditableThought({ thought, categoryIndex, thoughtIndex, onSave, onCance
             <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={handleSave}>
                 <Check className="h-4 w-4 text-green-600" />
                 <span className="sr-only">Save thought</span>
+            </Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={onCancel}>
+                <X className="h-4 w-4 text-destructive" />
+                <span className="sr-only">Cancel edit</span>
             </Button>
         </div>
     );
@@ -350,12 +354,12 @@ export default function Home() {
         return thoughts.flatMap(group => group.thoughts);
     }
 
-    const loadingMessages = [
+    const loadingMessages = useMemo(() => [
         "Reading thoughts...",
         "Untangling each thread...",
         "Creating perfect categories...",
         "Almost there...",
-    ];
+    ], []);
     
     useEffect(() => {
         let interval: NodeJS.Timeout;
@@ -438,7 +442,7 @@ export default function Home() {
         }
       };
 
-  const handleReorganize = async () => {
+  const handleReorganize = useCallback(async () => {
     const fullBrainDump = reGenerateBrainDumpFromThoughts(categorizedThoughts);
     if (!fullBrainDump) {
       toast({
@@ -474,21 +478,21 @@ export default function Home() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [categorizedThoughts, toast]);
 
-  const handleClearAll = () => {
+  const handleClearAll = useCallback(() => {
     updateLocalStorage(null);
     setCurrentBrainDump('');
-  };
+  }, []);
 
-  const handleCreateCard = () => {
+  const handleCreateCard = useCallback(() => {
     const newCard = { category: 'New Category', thoughts: [] };
     const newCategorizedThoughts = categorizedThoughts ? [...categorizedThoughts, newCard] : [newCard];
     updateLocalStorage(newCategorizedThoughts);
     setEditingCategory(newCategorizedThoughts.length - 1);
-  };
+  }, [categorizedThoughts]);
 
-  const handleAddThought = (categoryIndex: number) => {
+  const handleAddThought = useCallback((categoryIndex: number) => {
     if (!categorizedThoughts) return;
 
     const newCategorizedThoughts = categorizedThoughts.map((category, cIndex) => {
@@ -505,9 +509,9 @@ export default function Home() {
       categoryIndex,
       thoughtIndex: newCategorizedThoughts[categoryIndex].thoughts.length - 1
     });
-  };
+  }, [categorizedThoughts]);
 
-    const handleDeleteThought = (categoryIndex: number, thoughtIndex: number) => {
+    const handleDeleteThought = useCallback((categoryIndex: number, thoughtIndex: number) => {
         if (!categorizedThoughts) return;
     
         const newCategorizedThoughts = categorizedThoughts.map((category, cIndex) => {
@@ -524,11 +528,11 @@ export default function Home() {
         } else {
             updateLocalStorage(newCategorizedThoughts);
         }
-    };
+    }, [categorizedThoughts]);
 
-  const handleEditThought = (categoryIndex: number, thoughtIndex: number) => {
+  const handleEditThought = useCallback((categoryIndex: number, thoughtIndex: number) => {
     setEditingThought({ categoryIndex, thoughtIndex });
-  };
+  }, []);
 
   const handleSaveThought = useCallback((categoryIndex: number, thoughtIndex: number, newText: string) => {
     if (!categorizedThoughts) return;
@@ -553,7 +557,7 @@ export default function Home() {
     setEditingThought(null);
   }, [categorizedThoughts]);
 
-  const handleDeleteCategory = (categoryIndex: number) => {
+  const handleDeleteCategory = useCallback((categoryIndex: number) => {
     if (!categorizedThoughts) return;
 
     const newCategorizedThoughts = categorizedThoughts.filter((_, cIndex) => cIndex !== categoryIndex);
@@ -563,11 +567,11 @@ export default function Home() {
     } else {
         updateLocalStorage(newCategorizedThoughts);
     }
-  };
+  }, [categorizedThoughts]);
 
-  const handleEditCategory = (categoryIndex: number) => {
+  const handleEditCategory = useCallback((categoryIndex: number) => {
     setEditingCategory(categoryIndex);
-  }
+  }, []);
 
   const handleSaveCategory = useCallback((categoryIndex: number, newText: string) => {
     if (!categorizedThoughts) return;
@@ -583,7 +587,7 @@ export default function Home() {
     setEditingCategory(null);
   }, [categorizedThoughts]);
 
-  const handleSendThoughtToChatGPT = async (thought: Thought) => {
+  const handleSendThoughtToChatGPT = useCallback(async (thought: Thought) => {
     const textToSend = thought.type === 'text' ? thought.content : (thought.transcription || '');
     if (!textToSend) return;
     setChatGPTLoadingThought(thought.id);
@@ -602,9 +606,9 @@ export default function Home() {
     } finally {
         setChatGPTLoadingThought(null);
     }
-  };
+  }, [toast]);
 
-    function handleDragEnd(event: DragEndEvent) {
+    const handleDragEnd = useCallback((event: DragEndEvent) => {
         const { active, over } = event;
     
         if (!over || !active.data.current) {
@@ -636,7 +640,7 @@ export default function Home() {
         const finalThoughts = newCategorizedThoughts.filter(c => c.thoughts.length > 0);
     
         updateLocalStorage(finalThoughts);
-    }
+    }, [categorizedThoughts]);
 
     const startRecording = async () => {
         try {
