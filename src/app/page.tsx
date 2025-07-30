@@ -86,6 +86,14 @@ DraggableThought.displayName = 'DraggableThought';
 
 function EditableCategoryTitle({ category, categoryIndex, onSave, onCancel }: { category: CategorizedThoughtGroup, categoryIndex: number, onSave: (index: number, text: string) => void, onCancel: () => void }) {
     const [text, setText] = useState(category.category);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (inputRef.current) {
+            inputRef.current.focus();
+            inputRef.current.select();
+        }
+    }, []);
 
     const handleSave = () => {
         onSave(categoryIndex, text);
@@ -93,12 +101,11 @@ function EditableCategoryTitle({ category, categoryIndex, onSave, onCancel }: { 
 
     return (
         <div className="flex-grow flex items-center gap-2">
-            <Input 
+            <Input
+                ref={inputRef} 
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 className="flex-grow"
-                autoFocus
-                onFocus={e => e.target.select()}
                 onBlur={handleSave}
                 onKeyDown={(e) => {
                     if (e.key === 'Enter') handleSave();
@@ -120,6 +127,8 @@ function EditableThought({ thought, categoryIndex, thoughtIndex, onSave, onCance
     const handleSave = () => {
         if (text.trim()) {
             onSave(categoryIndex, thoughtIndex, text);
+        } else {
+            onCancel(); // Cancel if the new text is empty
         }
     };
     
@@ -136,7 +145,7 @@ function EditableThought({ thought, categoryIndex, thoughtIndex, onSave, onCance
     const props = isAudio ? { ref: inputRef } : { ref: inputRef, rows: 2 };
 
     return (
-        <div className="flex-grow flex items-center gap-2">
+        <div className="flex-grow flex items-center gap-2 w-full">
             <Component
                 value={text}
                 onChange={(e) => setText(e.target.value)}
@@ -154,14 +163,16 @@ function EditableThought({ thought, categoryIndex, thoughtIndex, onSave, onCance
                 }}
                 {...props}
             />
-            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={handleSave}>
-                <Check className="h-4 w-4 text-green-600" />
-                <span className="sr-only">Save thought</span>
-            </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={onCancel}>
-                <X className="h-4 w-4 text-destructive" />
-                <span className="sr-only">Cancel edit</span>
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-1">
+                <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={handleSave}>
+                    <Check className="h-4 w-4 text-green-600" />
+                    <span className="sr-only">Save thought</span>
+                </Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={onCancel}>
+                    <X className="h-4 w-4 text-destructive" />
+                    <span className="sr-only">Cancel edit</span>
+                </Button>
+            </div>
         </div>
     );
 }
@@ -246,7 +257,7 @@ const ThoughtCategoryCard = React.memo(({
                                     />
                                 ) : (
                                     <>
-                                        <div className="flex-grow flex items-center">
+                                        <div className="flex-grow flex items-center min-w-0">
                                             <DraggableThought
                                                 thought={thought}
                                                 onTogglePlayPause={onTogglePlayPause}
@@ -254,7 +265,7 @@ const ThoughtCategoryCard = React.memo(({
                                             />
                                         </div>
 
-                                        <div className="flex items-center">
+                                        <div className="flex items-center flex-wrap flex-shrink-0 justify-end gap-0.5">
                                             <Button
                                                 variant="ghost"
                                                 size="icon"
@@ -330,14 +341,14 @@ export default function Home() {
         }
     }, []);
 
-    const updateLocalStorage = (newThoughts: CategorizedThoughts | null) => {
+    const updateLocalStorage = useCallback((newThoughts: CategorizedThoughts | null) => {
         if (newThoughts) {
             localStorage.setItem('categorizedThoughts', JSON.stringify(newThoughts));
         } else {
             localStorage.removeItem('categorizedThoughts');
         }
         setCategorizedThoughts(newThoughts);
-    };
+    }, []);
 
     const reGenerateBrainDumpFromThoughts = (thoughts: CategorizedThoughts | null) => {
         if (!thoughts) return '';
@@ -378,30 +389,42 @@ export default function Home() {
         };
     }, [isLoading, loadingMessages]);
 
-    const processAndSetThoughts = (rawGroupedThoughts: GroupThoughtsIntoCategoriesOutput['groupedThoughts'], existingThoughts: Thought[]) => {
+    const processAndSetThoughts = useCallback((rawGroupedThoughts: GroupThoughtsIntoCategoriesOutput['groupedThoughts'], existingThoughts: Thought[]) => {
         const existingThoughtsMap = new Map(existingThoughts.map(t => [(t.type === 'text' ? t.content : t.transcription || ''), t]));
         
         const groupedThoughts: CategorizedThoughts = rawGroupedThoughts.map(group => ({
             category: group.category,
-            thoughts: group.thoughts.map(thoughtText => {
+            thoughts: group.thoughts.flatMap(thoughtText => {
                 const existingThought = existingThoughtsMap.get(thoughtText);
                 if (existingThought) {
-                    // It's a re-categorized existing thought (could be text or audio)
-                    return existingThought;
+                    existingThoughtsMap.delete(thoughtText); // Remove from map to handle duplicates
+                    return [existingThought];
                 }
                 // It's a new text thought from the brain dump
-                return {
+                return [{
                     id: crypto.randomUUID(),
                     type: 'text',
                     content: thoughtText,
-                };
+                }];
             })
         }));
 
-        updateLocalStorage(groupedThoughts);
-    };
+        // Add any remaining thoughts (e.g. audio notes that were not re-categorized) to a 'Misc' category
+        const remainingThoughts = Array.from(existingThoughtsMap.values());
+        if(remainingThoughts.length > 0) {
+            const miscCategoryIndex = groupedThoughts.findIndex(g => g.category.toLowerCase() === 'misc');
+            if (miscCategoryIndex !== -1) {
+                groupedThoughts[miscCategoryIndex].thoughts.push(...remainingThoughts);
+            } else {
+                groupedThoughts.push({ category: 'Misc', thoughts: remainingThoughts });
+            }
+        }
 
-    const handleAnalyze = async () => {
+
+        updateLocalStorage(groupedThoughts);
+    }, [updateLocalStorage]);
+
+    const handleAnalyze = useCallback(async () => {
         if (!currentBrainDump.trim()) {
             toast({
                 title: "Input is empty",
@@ -440,7 +463,7 @@ export default function Home() {
         } finally {
           setIsLoading(false);
         }
-      };
+      }, [categorizedThoughts, currentBrainDump, processAndSetThoughts, toast]);
 
   const handleReorganize = useCallback(async () => {
     const fullBrainDump = reGenerateBrainDumpFromThoughts(categorizedThoughts);
@@ -478,7 +501,7 @@ export default function Home() {
     } finally {
       setIsLoading(false);
     }
-  }, [categorizedThoughts, toast]);
+  }, [categorizedThoughts, processAndSetThoughts, toast]);
 
   const handleClearAll = useCallback(() => {
     if (audioRef.current) {
@@ -487,14 +510,14 @@ export default function Home() {
     }
     updateLocalStorage(null);
     setCurrentBrainDump('');
-  }, []);
+  }, [updateLocalStorage]);
 
   const handleCreateCard = useCallback(() => {
     const newCard = { category: 'New Category', thoughts: [] };
     const newCategorizedThoughts = categorizedThoughts ? [...categorizedThoughts, newCard] : [newCard];
     updateLocalStorage(newCategorizedThoughts);
     setEditingCategory(newCategorizedThoughts.length - 1);
-  }, [categorizedThoughts]);
+  }, [categorizedThoughts, updateLocalStorage]);
 
   const handleAddThought = useCallback((categoryIndex: number) => {
     if (!categorizedThoughts) return;
@@ -513,7 +536,7 @@ export default function Home() {
       categoryIndex,
       thoughtIndex: newCategorizedThoughts[categoryIndex].thoughts.length - 1
     });
-  }, [categorizedThoughts]);
+  }, [categorizedThoughts, updateLocalStorage]);
 
     const handleDeleteThought = useCallback((categoryIndex: number, thoughtIndex: number) => {
         if (!categorizedThoughts) return;
@@ -542,7 +565,7 @@ export default function Home() {
         } else {
             updateLocalStorage(finalCategorizedThoughts);
         }
-    }, [categorizedThoughts, playingAudioId]);
+    }, [categorizedThoughts, playingAudioId, updateLocalStorage]);
 
   const handleEditThought = useCallback((categoryIndex: number, thoughtIndex: number) => {
     setEditingThought({ categoryIndex, thoughtIndex });
@@ -569,7 +592,7 @@ export default function Home() {
   
     updateLocalStorage(newCategorizedThoughts);
     setEditingThought(null);
-  }, [categorizedThoughts]);
+  }, [categorizedThoughts, updateLocalStorage]);
 
   const handleDeleteCategory = useCallback((categoryIndex: number) => {
     if (!categorizedThoughts) return;
@@ -581,7 +604,7 @@ export default function Home() {
     } else {
         updateLocalStorage(newCategorizedThoughts);
     }
-  }, [categorizedThoughts]);
+  }, [categorizedThoughts, updateLocalStorage]);
 
   const handleEditCategory = useCallback((categoryIndex: number) => {
     setEditingCategory(categoryIndex);
@@ -599,7 +622,7 @@ export default function Home() {
 
     updateLocalStorage(newCategorizedThoughts);
     setEditingCategory(null);
-  }, [categorizedThoughts]);
+  }, [categorizedThoughts, updateLocalStorage]);
 
   const handleSendThoughtToChatGPT = useCallback(async (thought: Thought) => {
     const textToSend = thought.type === 'text' ? thought.content : (thought.transcription || '');
@@ -654,7 +677,7 @@ export default function Home() {
         const finalThoughts = newCategorizedThoughts.filter(c => c.thoughts.length > 0);
     
         updateLocalStorage(finalThoughts);
-    }, [categorizedThoughts]);
+    }, [categorizedThoughts, updateLocalStorage]);
 
     const startRecording = async () => {
         try {
