@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -30,6 +30,8 @@ type CategorizedThoughtGroup = {
 };
 
 type CategorizedThoughts = CategorizedThoughtGroup[];
+
+// --- Helper Components ---
 
 const DraggableThought = React.memo(({ thought, onTogglePlayPause, playingAudioId }: { thought: Thought; onTogglePlayPause: (thought: Thought) => void; playingAudioId: string | null; }) => {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
@@ -82,6 +84,84 @@ const DraggableThought = React.memo(({ thought, onTogglePlayPause, playingAudioI
 DraggableThought.displayName = 'DraggableThought';
 
 
+function EditableCategoryTitle({ category, categoryIndex, onSave, onCancel }: { category: CategorizedThoughtGroup, categoryIndex: number, onSave: (index: number, text: string) => void, onCancel: () => void }) {
+    const [text, setText] = useState(category.category);
+
+    const handleSave = () => {
+        onSave(categoryIndex, text);
+    };
+
+    return (
+        <div className="flex-grow flex items-center gap-2">
+            <Input 
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                className="flex-grow"
+                autoFocus
+                onFocus={e => e.target.select()}
+                onBlur={handleSave}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSave();
+                    if (e.key === 'Escape') onCancel();
+                }}
+            />
+            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={handleSave}>
+                <Check className="h-4 w-4 text-green-600" />
+                <span className="sr-only">Save category</span>
+            </Button>
+        </div>
+    );
+}
+
+function EditableThought({ thought, categoryIndex, thoughtIndex, onSave, onCancel }: { thought: Thought, categoryIndex: number, thoughtIndex: number, onSave: (catIndex: number, thoughtIndex: number, text: string) => void, onCancel: () => void }) {
+    const isAudio = thought.type === 'audio';
+    const [text, setText] = useState(isAudio ? thought.title || '' : thought.content);
+    
+    const handleSave = () => {
+        if (text.trim()) {
+            onSave(categoryIndex, thoughtIndex, text);
+        }
+    };
+    
+    const inputRef = useRef<HTMLInputElement & HTMLTextAreaElement>(null);
+
+    useEffect(() => {
+        if (inputRef.current) {
+            inputRef.current.focus();
+            inputRef.current.setSelectionRange(text.length, text.length);
+        }
+    }, [text.length]);
+
+    const Component = isAudio ? Input : Textarea;
+    const props = isAudio ? { ref: inputRef } : { ref: inputRef, rows: 2 };
+
+    return (
+        <div className="flex-grow flex items-center gap-2">
+            <Component
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                className="flex-grow"
+                onBlur={handleSave}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter' && (isAudio || e.metaKey || e.ctrlKey)) {
+                      e.preventDefault();
+                      handleSave();
+                    }
+                    if (e.key === 'Escape') {
+                        e.preventDefault();
+                        onCancel();
+                    }
+                }}
+                {...props}
+            />
+            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={handleSave}>
+                <Check className="h-4 w-4 text-green-600" />
+                <span className="sr-only">Save thought</span>
+            </Button>
+        </div>
+    );
+}
+
 const ThoughtCategoryCard = React.memo(({
     card,
     categoryIndex,
@@ -89,17 +169,17 @@ const ThoughtCategoryCard = React.memo(({
     editingThought,
     playingAudioId,
     chatGPTLoadingThought,
-    handleSaveCategory,
-    setEditingCategory,
-    handleAddThought,
-    handleEditCategory,
-    handleDeleteCategory,
-    handleSaveThought,
-    setEditingThought,
-    togglePlayPause,
-    handleSendThoughtToChatGPT,
-    handleEditThought,
-    handleDeleteThought,
+    onSaveCategory,
+    onSetEditingCategory,
+    onAddThought,
+    onEditCategory,
+    onDeleteCategory,
+    onSaveThought,
+    onSetEditingThought,
+    onTogglePlayPause,
+    onSendThoughtToChatGPT,
+    onEditThought,
+    onDeleteThought,
 }: {
     card: CategorizedThoughtGroup;
     categoryIndex: number;
@@ -107,17 +187,17 @@ const ThoughtCategoryCard = React.memo(({
     editingThought: { categoryIndex: number, thoughtIndex: number } | null;
     playingAudioId: string | null;
     chatGPTLoadingThought: string | null;
-    handleSaveCategory: (categoryIndex: number, newText: string) => void;
-    setEditingCategory: (index: number | null) => void;
-    handleAddThought: (categoryIndex: number) => void;
-    handleEditCategory: (categoryIndex: number) => void;
-    handleDeleteCategory: (categoryIndex: number) => void;
-    handleSaveThought: (categoryIndex: number, thoughtIndex: number, newText: string) => void;
-    setEditingThought: (details: { categoryIndex: number, thoughtIndex: number } | null) => void;
-    togglePlayPause: (thought: Thought) => void;
-    handleSendThoughtToChatGPT: (thought: Thought) => void;
-    handleEditThought: (categoryIndex: number, thoughtIndex: number) => void;
-    handleDeleteThought: (categoryIndex: number, thoughtIndex: number) => void;
+    onSaveCategory: (categoryIndex: number, newText: string) => void;
+    onSetEditingCategory: (index: number | null) => void;
+    onAddThought: (categoryIndex: number) => void;
+    onEditCategory: (categoryIndex: number) => void;
+    onDeleteCategory: (categoryIndex: number) => void;
+    onSaveThought: (categoryIndex: number, thoughtIndex: number, newText: string) => void;
+    onSetEditingThought: (details: { categoryIndex: number, thoughtIndex: number } | null) => void;
+    onTogglePlayPause: (thought: Thought) => void;
+    onSendThoughtToChatGPT: (thought: Thought) => void;
+    onEditThought: (categoryIndex: number, thoughtIndex: number) => void;
+    onDeleteThought: (categoryIndex: number, thoughtIndex: number) => void;
 }) => {
     return (
         <div className="animate-in fade-in-0 zoom-in-95 duration-500 inline-block w-full break-inside-avoid">
@@ -127,21 +207,21 @@ const ThoughtCategoryCard = React.memo(({
                         <EditableCategoryTitle
                             category={card}
                             categoryIndex={categoryIndex}
-                            onSave={handleSaveCategory}
-                            onCancel={() => setEditingCategory(null)}
+                            onSave={onSaveCategory}
+                            onCancel={() => onSetEditingCategory(null)}
                         />
                     ) : (
                         <>
                             <CardTitle className="capitalize font-headline flex-grow">{card.category}</CardTitle>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => handleAddThought(categoryIndex)}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => onAddThought(categoryIndex)}>
                                 <Plus className="h-4 w-4 text-muted-foreground hover:text-primary" />
                                 <span className="sr-only">Add thought</span>
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => handleEditCategory(categoryIndex)}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => onEditCategory(categoryIndex)}>
                                 <Edit className="h-4 w-4 text-muted-foreground hover:text-primary" />
                                 <span className="sr-only">Edit category</span>
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => handleDeleteCategory(categoryIndex)}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => onDeleteCategory(categoryIndex)}>
                                 <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
                                 <span className="sr-only">Delete category</span>
                             </Button>
@@ -157,15 +237,15 @@ const ThoughtCategoryCard = React.memo(({
                                         thought={thought}
                                         categoryIndex={categoryIndex}
                                         thoughtIndex={thoughtIndex}
-                                        onSave={handleSaveThought}
-                                        onCancel={() => setEditingThought(null)}
+                                        onSave={onSaveThought}
+                                        onCancel={() => onSetEditingThought(null)}
                                     />
                                 ) : (
                                     <>
                                         <div className="flex-grow flex items-center">
                                             <DraggableThought
                                                 thought={thought}
-                                                onTogglePlayPause={togglePlayPause}
+                                                onTogglePlayPause={onTogglePlayPause}
                                                 playingAudioId={playingAudioId}
                                             />
                                         </div>
@@ -175,7 +255,7 @@ const ThoughtCategoryCard = React.memo(({
                                                 variant="ghost"
                                                 size="icon"
                                                 className="h-8 w-8 shrink-0"
-                                                onClick={() => handleSendThoughtToChatGPT(thought)}
+                                                onClick={() => onSendThoughtToChatGPT(thought)}
                                                 disabled={chatGPTLoadingThought !== null}
                                             >
                                                 {chatGPTLoadingThought === thought.id ? (
@@ -189,7 +269,7 @@ const ThoughtCategoryCard = React.memo(({
                                                 variant="ghost"
                                                 size="icon"
                                                 className="h-8 w-8 shrink-0"
-                                                onClick={() => handleEditThought(categoryIndex, thoughtIndex)}
+                                                onClick={() => onEditThought(categoryIndex, thoughtIndex)}
                                             >
                                                 <Edit className="h-4 w-4 text-muted-foreground hover:text-primary" />
                                                 <span className="sr-only">Edit thought</span>
@@ -198,7 +278,7 @@ const ThoughtCategoryCard = React.memo(({
                                                 variant="ghost"
                                                 size="icon"
                                                 className="h-8 w-8 shrink-0"
-                                                onClick={() => handleDeleteThought(categoryIndex, thoughtIndex)}
+                                                onClick={() => onDeleteThought(categoryIndex, thoughtIndex)}
                                             >
                                                 <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
                                                 <span className="sr-only">Delete thought</span>
@@ -292,7 +372,7 @@ export default function Home() {
                 clearInterval(interval)
             }
         };
-    }, [isLoading]);
+    }, [isLoading, loadingMessages]);
 
     const processAndSetThoughts = (rawGroupedThoughts: GroupThoughtsIntoCategoriesOutput['groupedThoughts'], existingThoughts: Thought[]) => {
         const existingThoughtsMap = new Map(existingThoughts.map(t => [(t.type === 'text' ? t.content : t.transcription || ''), t]));
@@ -450,7 +530,7 @@ export default function Home() {
     setEditingThought({ categoryIndex, thoughtIndex });
   };
 
-  const handleSaveThought = (categoryIndex: number, thoughtIndex: number, newText: string) => {
+  const handleSaveThought = useCallback((categoryIndex: number, thoughtIndex: number, newText: string) => {
     if (!categorizedThoughts) return;
       
     const newCategorizedThoughts = categorizedThoughts.map((category, cIndex) => {
@@ -471,7 +551,7 @@ export default function Home() {
   
     updateLocalStorage(newCategorizedThoughts);
     setEditingThought(null);
-  };
+  }, [categorizedThoughts]);
 
   const handleDeleteCategory = (categoryIndex: number) => {
     if (!categorizedThoughts) return;
@@ -489,7 +569,7 @@ export default function Home() {
     setEditingCategory(categoryIndex);
   }
 
-  const handleSaveCategory = (categoryIndex: number, newText: string) => {
+  const handleSaveCategory = useCallback((categoryIndex: number, newText: string) => {
     if (!categorizedThoughts) return;
 
     const newCategorizedThoughts = categorizedThoughts.map((category, cIndex) => {
@@ -501,7 +581,7 @@ export default function Home() {
 
     updateLocalStorage(newCategorizedThoughts);
     setEditingCategory(null);
-  }
+  }, [categorizedThoughts]);
 
   const handleSendThoughtToChatGPT = async (thought: Thought) => {
     const textToSend = thought.type === 'text' ? thought.content : (thought.transcription || '');
@@ -638,7 +718,7 @@ export default function Home() {
         }
     };
 
-    const togglePlayPause = (thought: Thought) => {
+    const togglePlayPause = useCallback((thought: Thought) => {
         if (playingAudioId === thought.id && audioRef.current) {
             audioRef.current.pause();
             setPlayingAudioId(null);
@@ -654,7 +734,7 @@ export default function Home() {
                 setPlayingAudioId(null);
             };
         }
-    };
+    }, [playingAudioId]);
   
 
   function CategoryDropZone({ categoryIndex, children }: { categoryIndex: number; children: React.ReactNode }) {
@@ -669,85 +749,6 @@ export default function Home() {
         </div>
     );
 }
-
-function EditableCategoryTitle({ category, categoryIndex, onSave, onCancel }) {
-    const [text, setText] = useState(category.category);
-
-    const handleSave = () => {
-        onSave(categoryIndex, text);
-    };
-
-    return (
-        <div className="flex-grow flex items-center gap-2">
-            <Input 
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                className="flex-grow"
-                autoFocus
-                onFocus={e => e.target.select()}
-                onBlur={handleSave}
-                onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleSave();
-                    if (e.key === 'Escape') onCancel();
-                }}
-            />
-            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={handleSave}>
-                <Check className="h-4 w-4 text-green-600" />
-                <span className="sr-only">Save category</span>
-            </Button>
-        </div>
-    );
-}
-
-function EditableThought({ thought, categoryIndex, thoughtIndex, onSave, onCancel }) {
-    const isAudio = thought.type === 'audio';
-    const [text, setText] = useState(isAudio ? thought.title || '' : thought.content);
-    
-    const handleSave = () => {
-        if (text.trim()) {
-            onSave(categoryIndex, thoughtIndex, text);
-        }
-    };
-    
-    const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
-
-    useEffect(() => {
-        if (inputRef.current) {
-            inputRef.current.focus();
-            inputRef.current.setSelectionRange(text.length, text.length);
-        }
-    }, []);
-
-    const Component = isAudio ? Input : Textarea;
-    const props = isAudio ? { ref: inputRef as React.Ref<HTMLInputElement> } : { ref: inputRef as React.Ref<HTMLTextAreaElement>, rows: 2 };
-
-    return (
-        <div className="flex-grow flex items-center gap-2">
-            <Component
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                className="flex-grow"
-                onBlur={handleSave}
-                onKeyDown={(e) => {
-                    if (e.key === 'Enter' && (isAudio || e.metaKey || e.ctrlKey)) {
-                      e.preventDefault();
-                      handleSave();
-                    }
-                    if (e.key === 'Escape') {
-                        e.preventDefault();
-                        onCancel();
-                    }
-                }}
-                {...props}
-            />
-            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={handleSave}>
-                <Check className="h-4 w-4 text-green-600" />
-                <span className="sr-only">Save thought</span>
-            </Button>
-        </div>
-    );
-}
-
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -843,17 +844,17 @@ function EditableThought({ thought, categoryIndex, thoughtIndex, onSave, onCance
                                 editingThought={editingThought}
                                 playingAudioId={playingAudioId}
                                 chatGPTLoadingThought={chatGPTLoadingThought}
-                                handleSaveCategory={handleSaveCategory}
-                                setEditingCategory={setEditingCategory}
-                                handleAddThought={handleAddThought}
-                                handleEditCategory={handleEditCategory}
-                                handleDeleteCategory={handleDeleteCategory}
-                                handleSaveThought={handleSaveThought}
-                                setEditingThought={setEditingThought}
-                                togglePlayPause={togglePlayPause}
-                                handleSendThoughtToChatGPT={handleSendThoughtToChatGPT}
-                                handleEditThought={handleEditThought}
-                                handleDeleteThought={handleDeleteThought}
+                                onSaveCategory={handleSaveCategory}
+                                onSetEditingCategory={setEditingCategory}
+                                onAddThought={handleAddThought}
+                                onEditCategory={handleEditCategory}
+                                onDeleteCategory={handleDeleteCategory}
+                                onSaveThought={handleSaveThought}
+                                onSetEditingThought={setEditingThought}
+                                onTogglePlayPause={togglePlayPause}
+                                onSendThoughtToChatGPT={handleSendThoughtToChatGPT}
+                                onEditThought={handleEditThought}
+                                onDeleteThought={handleDeleteThought}
                             />
                         </CategoryDropZone>
                     ))}
