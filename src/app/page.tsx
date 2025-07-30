@@ -15,11 +15,6 @@ import { Input } from '@/components/ui/input';
 import { ThemeSwitcher } from '@/components/theme-switcher';
 import { DndContext, useDraggable, useDroppable, PointerSensor, KeyboardSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 
-import { auth, db } from '@/lib/firebase';
-import { doc, setDoc, onSnapshot } from 'firebase/firestore';
-import { GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, User } from 'firebase/auth';
-
-
 type CategorizedThoughts = GroupThoughtsIntoCategoriesOutput['groupedThoughts'];
 
 function DraggableThought({ thought, categoryIndex, thoughtIndex }: { thought: string; categoryIndex: number; thoughtIndex: number; }) {
@@ -63,10 +58,9 @@ function DraggableThought({ thought, categoryIndex, thoughtIndex }: { thought: s
 
 
 export default function Home() {
-  const [user, setUser] = useState<User | null>(null);
   const [currentBrainDump, setCurrentBrainDump] = useState('');
   const [categorizedThoughts, setCategorizedThoughts] = useState<CategorizedThoughts | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [chatGPTLoadingThought, setChatGPTLoadingThought] = useState<{categoryIndex: number, thoughtIndex: number} | null>(null);
   const [editingThought, setEditingThought] = useState<{categoryIndex: number, thoughtIndex: number} | null>(null);
   const [editingCategory, setEditingCategory] = useState<number | null>(null);
@@ -79,48 +73,19 @@ export default function Home() {
     );
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-            setUser(currentUser);
-            if (!currentUser) {
-                setIsLoading(false);
-            }
-        });
-        return () => unsubscribe();
+        const savedThoughts = localStorage.getItem('categorizedThoughts');
+        if (savedThoughts) {
+            setCategorizedThoughts(JSON.parse(savedThoughts));
+        }
     }, []);
 
-    useEffect(() => {
-        if (user) {
-            setIsLoading(true);
-            const docRef = doc(db, 'users', user.uid);
-            const unsubscribe = onSnapshot(docRef, (docSnap) => {
-                if (docSnap.exists()) {
-                    const data = docSnap.data();
-                    setCategorizedThoughts(data.thoughts || null);
-                } else {
-                    setCategorizedThoughts(null);
-                }
-                setIsLoading(false);
-            });
-            return () => unsubscribe();
+    const updateLocalStorage = (newThoughts: CategorizedThoughts | null) => {
+        if (newThoughts) {
+            localStorage.setItem('categorizedThoughts', JSON.stringify(newThoughts));
         } else {
-            setCategorizedThoughts(null);
+            localStorage.removeItem('categorizedThoughts');
         }
-    }, [user]);
-
-    const updateFirestore = async (newThoughts: CategorizedThoughts | null) => {
-        if (user) {
-            try {
-                const docRef = doc(db, 'users', user.uid);
-                await setDoc(docRef, { thoughts: newThoughts }, { merge: true });
-            } catch (error) {
-                console.error("Error updating Firestore: ", error);
-                toast({
-                    title: "Sync Error",
-                    description: "Could not save your thoughts to the cloud.",
-                    variant: "destructive",
-                });
-            }
-        }
+        setCategorizedThoughts(newThoughts);
     };
 
     const reGenerateBrainDumpFromThoughts = (thoughts: CategorizedThoughts | null) => {
@@ -147,7 +112,7 @@ export default function Home() {
       const { categories } = await categorizeBrainDump({ brainDump: newFullBrainDump });
       if (categories && categories.length > 0) {
         const { groupedThoughts } = await groupThoughtsIntoCategories({ brainDump: newFullBrainDump, categories });
-        await updateFirestore(groupedThoughts);
+        updateLocalStorage(groupedThoughts);
         setCurrentBrainDump(''); // Clear the input textarea
       } else {
         toast({
@@ -185,7 +150,7 @@ export default function Home() {
       const { categories } = await categorizeBrainDump({ brainDump: fullBrainDump });
       if (categories && categories.length > 0) {
         const { groupedThoughts } = await groupThoughtsIntoCategories({ brainDump: fullBrainDump, categories });
-        await updateFirestore(groupedThoughts);
+        updateLocalStorage(groupedThoughts);
       } else {
         toast({
           title: "Reorganization Error",
@@ -205,19 +170,19 @@ export default function Home() {
     }
   };
 
-  const handleClearAll = async () => {
-    await updateFirestore(null);
+  const handleClearAll = () => {
+    updateLocalStorage(null);
     setCurrentBrainDump('');
   };
 
-  const handleCreateCard = async () => {
+  const handleCreateCard = () => {
     const newCard = { category: 'New Category', thoughts: [] };
     const newCategorizedThoughts = categorizedThoughts ? [...categorizedThoughts, newCard] : [newCard];
-    await updateFirestore(newCategorizedThoughts);
+    updateLocalStorage(newCategorizedThoughts);
     setEditingCategory(newCategorizedThoughts.length - 1);
   };
 
-  const handleAddThought = async (categoryIndex: number) => {
+  const handleAddThought = (categoryIndex: number) => {
     if (!categorizedThoughts) return;
 
     const newCategorizedThoughts = categorizedThoughts.map((category, cIndex) => {
@@ -228,14 +193,14 @@ export default function Home() {
       return category;
     });
 
-    await updateFirestore(newCategorizedThoughts);
+    updateLocalStorage(newCategorizedThoughts);
     setEditingThought({
       categoryIndex,
       thoughtIndex: newCategorizedThoughts[categoryIndex].thoughts.length - 1
     });
   };
 
-  const handleDeleteThought = async (categoryIndex: number, thoughtIndex: number) => {
+  const handleDeleteThought = (categoryIndex: number, thoughtIndex: number) => {
     if (!categorizedThoughts) return;
   
     const newCategorizedThoughts = categorizedThoughts.map((category, cIndex) => {
@@ -248,9 +213,9 @@ export default function Home() {
     }).filter(category => category.thoughts.length > 0);
     
     if (newCategorizedThoughts.length === 0) {
-      await updateFirestore(null);
+      updateLocalStorage(null);
     } else {
-      await updateFirestore(newCategorizedThoughts);
+      updateLocalStorage(newCategorizedThoughts);
     }
   };
 
@@ -258,7 +223,7 @@ export default function Home() {
     setEditingThought({ categoryIndex, thoughtIndex });
   };
 
-  const handleSaveThought = async (categoryIndex: number, thoughtIndex: number, newText: string) => {
+  const handleSaveThought = (categoryIndex: number, thoughtIndex: number, newText: string) => {
     if (!categorizedThoughts) return;
       
     const newCategorizedThoughts = categorizedThoughts.map((category, cIndex) => {
@@ -270,19 +235,19 @@ export default function Home() {
         return category;
     });
   
-    await updateFirestore(newCategorizedThoughts);
+    updateLocalStorage(newCategorizedThoughts);
     setEditingThought(null);
   };
 
-  const handleDeleteCategory = async (categoryIndex: number) => {
+  const handleDeleteCategory = (categoryIndex: number) => {
     if (!categorizedThoughts) return;
 
     const newCategorizedThoughts = categorizedThoughts.filter((_, cIndex) => cIndex !== categoryIndex);
 
     if (newCategorizedThoughts.length === 0) {
-        await updateFirestore(null);
+        updateLocalStorage(null);
     } else {
-        await updateFirestore(newCategorizedThoughts);
+        updateLocalStorage(newCategorizedThoughts);
     }
   };
 
@@ -290,7 +255,7 @@ export default function Home() {
     setEditingCategory(categoryIndex);
   }
 
-  const handleSaveCategory = async (categoryIndex: number, newText: string) => {
+  const handleSaveCategory = (categoryIndex: number, newText: string) => {
     if (!categorizedThoughts) return;
 
     const newCategorizedThoughts = categorizedThoughts.map((category, cIndex) => {
@@ -300,7 +265,7 @@ export default function Home() {
         return category;
     });
 
-    await updateFirestore(newCategorizedThoughts);
+    updateLocalStorage(newCategorizedThoughts);
     setEditingCategory(null);
   }
 
@@ -327,7 +292,7 @@ export default function Home() {
     }
   };
 
-  async function handleDragEnd(event: DragEndEvent) {
+  function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
 
     if (!over || !active.data.current || !categorizedThoughts) {
@@ -354,7 +319,7 @@ export default function Home() {
 
     const finalThoughts = newCategorizedThoughts.filter(c => c.thoughts.length > 0);
 
-    await updateFirestore(finalThoughts);
+    updateLocalStorage(finalThoughts);
   }
 
 
@@ -427,32 +392,6 @@ function EditableThought({ thought, categoryIndex, thoughtIndex, onSave, onCance
     );
 }
 
-const signInWithGoogle = async () => {
-    const provider = new GoogleAuthProvider();
-    try {
-        await signInWithPopup(auth, provider);
-    } catch (error) {
-        console.error("Error signing in with Google: ", error);
-        toast({
-            title: "Sign-in failed",
-            description: "Could not sign you in with Google. Please try again.",
-            variant: "destructive",
-        });
-    }
-};
-
-const handleSignOut = async () => {
-    try {
-        await signOut(auth);
-    } catch (error) {
-        console.error("Error signing out: ", error);
-        toast({
-            title: "Sign-out failed",
-            description: "Could not sign you out. Please try again.",
-            variant: "destructive",
-        });
-    }
-};
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -471,23 +410,11 @@ const handleSignOut = async () => {
           </div>
           <div className="flex items-center gap-4">
             <ThemeSwitcher />
-            {user ? (
-                <Button onClick={handleSignOut} variant="outline">Sign Out</Button>
-            ) : (
-                <Button onClick={signInWithGoogle}>Sign In with Google</Button>
-            )}
           </div>
         </div>
       </header>
 
       <main className="flex-grow container mx-auto p-4 md:p-6">
-        {!user ? (
-            <div className="text-center py-20">
-                <h2 className="text-2xl font-bold">Welcome to MindFlow</h2>
-                <p className="text-muted-foreground mt-2">Please sign in to continue and sync your thoughts across devices.</p>
-            </div>
-        ) : (
-            <>
         <div className="max-w-4xl mx-auto">
           <div className="space-y-4">
             <Textarea
@@ -500,17 +427,17 @@ const handleSignOut = async () => {
               rows={10}
             />
             <div className="flex flex-col sm:flex-row gap-2">
-              <Button onClick={handleAnalyze} disabled={isLoading || !currentBrainDump.trim()} className="flex-1 text-lg py-6">
-                {isLoading && !categorizedThoughts ? (
+              <Button onClick={handleAnalyze} disabled={isLoading} className="flex-1 text-lg py-6">
+                {isLoading ? (
                   <LoaderCircle className="animate-spin mr-2" />
                 ) : null}
-                {isLoading && !categorizedThoughts ? 'Analyzing...' : 'Untangle Thoughts'}
+                {isLoading ? 'Analyzing...' : 'Untangle Thoughts'}
               </Button>
             </div>
           </div>
         </div>
         
-        {isLoading && (
+        {isLoading && !categorizedThoughts && (
             <div className="flex justify-center items-center py-20">
                 <LoaderCircle className="w-16 h-16 animate-spin text-primary" />
             </div>
@@ -632,8 +559,6 @@ const handleSignOut = async () => {
                 )}
             </div>
         </DndContext>
-        </>
-        )}
       </main>
 
       <footer className="py-4 text-center text-sm text-muted-foreground border-t bg-background">
@@ -642,5 +567,3 @@ const handleSignOut = async () => {
     </div>
   );
 }
-
-    
