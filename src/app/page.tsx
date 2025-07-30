@@ -58,7 +58,7 @@ const DraggableThought = React.memo(({ thought, onTogglePlayPause, playingAudioI
                     strokeWidth="2"
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    className="h-5 w-5 text-muted-foreground"
+                    className="h-4 w-4 md:h-5 md:w-5 text-muted-foreground"
                 >
                     <circle cx="9" cy="9" r="1" />
                     <circle cx="9" cy="15" r="1" />
@@ -72,7 +72,7 @@ const DraggableThought = React.memo(({ thought, onTogglePlayPause, playingAudioI
                 ) : (
                     <div className="flex items-center gap-2">
                          <Button variant="ghost" size="icon" onClick={() => onTogglePlayPause(thought)}>
-                            {playingAudioId === thought.id ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+                            {playingAudioId === thought.id ? <Pause className="h-4 w-4 md:h-5 md:w-5" /> : <Play className="h-4 w-4 md:h-5 md:w-5" />}
                         </Button>
                         <div className="flex-grow text-sm italic">{thought.title || 'Audio Note'}</div>
                     </div>
@@ -246,7 +246,7 @@ const ThoughtCategoryCard = React.memo(({
                 <CardContent className="flex-grow">
                     <ul className="space-y-3">
                         {card.thoughts.map((thought, thoughtIndex) => (
-                            <li key={thought.id} className="flex items-start justify-between gap-2 p-3 rounded-md bg-secondary/50">
+                            <li key={thought.id} className="flex items-start justify-between gap-2 p-3 rounded-md bg-secondary/50 text-sm">
                                 {editingThought?.categoryIndex === categoryIndex && editingThought?.thoughtIndex === thoughtIndex ? (
                                     <EditableThought
                                         thought={thought}
@@ -821,7 +821,7 @@ export default function Home() {
                 setCurrentBrainDump(e.target.value);
               }}
               placeholder="Dump all your thoughts, ideas, and tasks here. Let your mind flow freely..."
-              className="min-h-[150px] md:min-h-[200px] text-base p-4 rounded-lg shadow-sm"
+              className="min-h-[150px] md:min-h-[200px] text-sm md:text-base p-4 rounded-lg shadow-sm"
               rows={8}
             />
             <div className="flex flex-col sm:flex-row gap-2">
