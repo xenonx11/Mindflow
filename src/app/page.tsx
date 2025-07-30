@@ -128,9 +128,9 @@ function EditableThought({ thought, categoryIndex, thoughtIndex, onSave, onCance
     useEffect(() => {
         if (inputRef.current) {
             inputRef.current.focus();
-            inputRef.current.setSelectionRange(text.length, text.length);
+            inputRef.current.select();
         }
-    }, [text.length]);
+    }, []);
 
     const Component = isAudio ? Input : Textarea;
     const props = isAudio ? { ref: inputRef } : { ref: inputRef, rows: 2 };
@@ -478,9 +478,13 @@ export default function Home() {
     } finally {
       setIsLoading(false);
     }
-  }, [categorizedThoughts, toast]);
+  }, [categorizedThoughts]);
 
   const handleClearAll = useCallback(() => {
+    if (audioRef.current) {
+        audioRef.current.pause();
+        setPlayingAudioId(null);
+    }
     updateLocalStorage(null);
     setCurrentBrainDump('');
   }, []);
@@ -513,7 +517,15 @@ export default function Home() {
 
     const handleDeleteThought = useCallback((categoryIndex: number, thoughtIndex: number) => {
         if (!categorizedThoughts) return;
-    
+        
+        const thoughtToDelete = categorizedThoughts[categoryIndex]?.thoughts[thoughtIndex];
+        if (thoughtToDelete && thoughtToDelete.id === playingAudioId) {
+            if (audioRef.current) {
+                audioRef.current.pause();
+            }
+            setPlayingAudioId(null);
+        }
+
         const newCategorizedThoughts = categorizedThoughts.map((category, cIndex) => {
             if (cIndex === categoryIndex) {
                 const newThoughts = [...category.thoughts];
@@ -528,7 +540,7 @@ export default function Home() {
         } else {
             updateLocalStorage(newCategorizedThoughts);
         }
-    }, [categorizedThoughts]);
+    }, [categorizedThoughts, playingAudioId]);
 
   const handleEditThought = useCallback((categoryIndex: number, thoughtIndex: number) => {
     setEditingThought({ categoryIndex, thoughtIndex });
