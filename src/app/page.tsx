@@ -803,3 +803,4 @@ function EditableThought({ thought, categoryIndex, thoughtIndex, onSave, onCance
     </div>
   );
 }
+
