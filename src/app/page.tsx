@@ -310,7 +310,13 @@ export default function Home() {
     const newCategorizedThoughts = categorizedThoughts.map((category, cIndex) => {
         if (cIndex === categoryIndex) {
             const newThoughts = [...category.thoughts];
-            const thoughtToUpdate = { ...newThoughts[thoughtIndex], content: newText };
+            const thoughtToUpdate = { ...newThoughts[thoughtIndex]};
+            if (thoughtToUpdate.type === 'text') {
+                thoughtToUpdate.content = newText;
+            } else {
+                thoughtToUpdate.title = newText;
+            }
+
             newThoughts[thoughtIndex] = thoughtToUpdate;
             return { ...category, thoughts: newThoughts };
         }
@@ -543,24 +549,29 @@ function EditableCategoryTitle({ category, categoryIndex, onSave, onCancel }) {
 }
 
 function EditableThought({ thought, categoryIndex, thoughtIndex, onSave, onCancel }) {
-    const [text, setText] = useState(thought.content);
+    const isAudio = thought.type === 'audio';
+    const [text, setText] = useState(isAudio ? thought.title || '' : thought.content);
     
     const handleSave = () => {
         onSave(categoryIndex, thoughtIndex, text);
     };
 
+    const Component = isAudio ? Input : Textarea;
+    const props = isAudio ? { } : { rows: 2 };
+
     return (
         <div className="flex-grow flex items-center gap-2">
-            <Textarea
+            <Component
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 className="flex-grow"
-                rows={2}
                 autoFocus
                 onBlur={handleSave}
                 onKeyDown={(e) => {
+                    if (e.key === 'Enter' && isAudio) handleSave();
                     if (e.key === 'Escape') onCancel();
                 }}
+                {...props}
             />
             <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={handleSave}>
                 <Check className="h-4 w-4 text-green-600" />
@@ -728,17 +739,15 @@ function EditableThought({ thought, categoryIndex, thoughtIndex, onSave, onCance
                                                         )}
                                                         <span className="sr-only">Send thought to ChatGPT</span>
                                                     </Button>
-                                                    {thought.type === 'text' && (
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            className="h-8 w-8 shrink-0"
-                                                            onClick={() => handleEditThought(categoryIndex, thoughtIndex)}
-                                                        >
-                                                            <Edit className="h-4 w-4 text-muted-foreground hover:text-primary" />
-                                                            <span className="sr-only">Edit thought</span>
-                                                        </Button>
-                                                    )}
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-8 w-8 shrink-0"
+                                                        onClick={() => handleEditThought(categoryIndex, thoughtIndex)}
+                                                    >
+                                                        <Edit className="h-4 w-4 text-muted-foreground hover:text-primary" />
+                                                        <span className="sr-only">Edit thought</span>
+                                                    </Button>
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
@@ -771,3 +780,5 @@ function EditableThought({ thought, categoryIndex, thoughtIndex, onSave, onCance
     </div>
   );
 }
+
+    
