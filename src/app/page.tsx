@@ -796,9 +796,9 @@ export default function Home() {
       <header className="py-6 md:py-8 bg-background border-b">
         <div className="container mx-auto px-4 md:px-6 flex justify-between items-center">
           <div className="flex items-center gap-3 md:gap-4">
-            <BrainCircuit className="w-10 h-10 md:w-12 md:h-12 text-primary" />
+            <BrainCircuit className="w-8 h-8 md:w-12 md:h-12 text-primary" />
             <div className="text-left">
-              <h1 className="text-3xl md:text-5xl font-bold font-headline tracking-tighter">
+              <h1 className="text-2xl md:text-5xl font-bold font-headline tracking-tighter">
                 MindFlow
               </h1>
               <p className="text-sm md:text-lg text-muted-foreground">
@@ -825,7 +825,7 @@ export default function Home() {
               rows={8}
             />
             <div className="flex flex-col sm:flex-row gap-2">
-              <Button onClick={handleAnalyze} disabled={isLoading || isRecording} className="flex-1 text-lg py-6">
+              <Button onClick={handleAnalyze} disabled={isLoading || isRecording} className="flex-1 text-base py-3 md:text-lg md:py-6">
                 {isLoading ? (
                   <>
                     <LoaderCircle className="animate-spin mr-2" />
@@ -833,7 +833,7 @@ export default function Home() {
                   </>
                 ) : 'Untangle Thoughts'}
               </Button>
-              <Button onClick={isRecording ? stopRecording : startRecording} disabled={isLoading} className="text-lg py-6" variant={isRecording ? 'destructive' : 'outline'}>
+              <Button onClick={isRecording ? stopRecording : startRecording} disabled={isLoading} className="text-base py-3 md:text-lg md:py-6" variant={isRecording ? 'destructive' : 'outline'}>
                 {isRecording ? (
                     <>
                         <Square className="mr-2" /> Stop
