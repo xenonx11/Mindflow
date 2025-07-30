@@ -205,7 +205,7 @@ const ThoughtCategoryCard = React.memo(({
 }) => {
     return (
         <div className="animate-in fade-in-0 zoom-in-95 duration-500 inline-block w-full break-inside-avoid">
-            <Card className="shadow-lg hover:shadow-xl transition-shadow flex flex-col">
+            <Card className="shadow-lg hover:shadow-xl transition-shadow flex flex-col h-full">
                 <CardHeader className="flex-row items-center gap-2">
                     {editingCategory === categoryIndex ? (
                         <EditableCategoryTitle
@@ -533,12 +533,14 @@ export default function Home() {
                 return { ...category, thoughts: newThoughts };
             }
             return category;
-        }).filter(category => category.thoughts.length > 0);
+        }).filter(category => category.thoughts.length > 0 || category.category === 'New Category');
         
-        if (newCategorizedThoughts.length === 0) {
+        const finalCategorizedThoughts = newCategorizedThoughts.filter(category => category.thoughts.length > 0);
+
+        if (finalCategorizedThoughts.length === 0) {
             updateLocalStorage(null);
         } else {
-            updateLocalStorage(newCategorizedThoughts);
+            updateLocalStorage(finalCategorizedThoughts);
         }
     }, [categorizedThoughts, playingAudioId]);
 
@@ -767,21 +769,21 @@ export default function Home() {
 }
 
   return (
-    <div className="flex flex-col min-h-screen">
-      <header className="py-8 bg-background border-b">
+    <div className="flex flex-col min-h-screen bg-background">
+      <header className="py-6 md:py-8 bg-background border-b">
         <div className="container mx-auto px-4 md:px-6 flex justify-between items-center">
-          <div className="flex items-center gap-4">
-            <BrainCircuit className="w-12 h-12 text-primary" />
+          <div className="flex items-center gap-3 md:gap-4">
+            <BrainCircuit className="w-10 h-10 md:w-12 md:h-12 text-primary" />
             <div className="text-left">
-              <h1 className="text-4xl md:text-5xl font-bold font-headline tracking-tighter">
+              <h1 className="text-3xl md:text-5xl font-bold font-headline tracking-tighter">
                 MindFlow
               </h1>
-              <p className="text-lg text-muted-foreground">
+              <p className="text-sm md:text-lg text-muted-foreground">
                 Untangle your thoughts. Let AI find the patterns.
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 md:gap-4">
             <ThemeSwitcher />
           </div>
         </div>
@@ -796,8 +798,8 @@ export default function Home() {
                 setCurrentBrainDump(e.target.value);
               }}
               placeholder="Dump all your thoughts, ideas, and tasks here. Let your mind flow freely..."
-              className="min-h-[200px] text-base p-4 rounded-lg shadow-sm"
-              rows={10}
+              className="min-h-[150px] md:min-h-[200px] text-base p-4 rounded-lg shadow-sm"
+              rows={8}
             />
             <div className="flex flex-col sm:flex-row gap-2">
               <Button onClick={handleAnalyze} disabled={isLoading || isRecording} className="flex-1 text-lg py-6">
@@ -832,9 +834,9 @@ export default function Home() {
         
         <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
             <div className="mt-12">
-                <div className="flex justify-between items-center mb-8">
-                <h2 className="text-3xl font-bold text-center font-headline">Your Organized Thoughts</h2>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+                <h2 className="text-2xl md:text-3xl font-bold text-center font-headline">Your Organized Thoughts</h2>
+                <div className="flex items-center gap-2 flex-wrap justify-center">
                     <Button variant="outline" size="sm" onClick={handleCreateCard} disabled={isLoading}>
                         <PlusSquare className="w-4 h-4 mr-2" />
                         Create
@@ -850,7 +852,7 @@ export default function Home() {
                 </div>
                 </div>
                 {categorizedThoughts && categorizedThoughts.length > 0 && (
-                    <div className="[column-count:1] md:[column-count:2] lg:[column-count:3] gap-6 space-y-6">
+                    <div className="space-y-6 md:space-y-0 md:grid md:grid-cols-2 lg:grid-cols-3 md:gap-6">
                     {categorizedThoughts.map((card, categoryIndex) => (
                         <CategoryDropZone key={`${card.category}-${categoryIndex}`} categoryIndex={categoryIndex}>
                             <ThoughtCategoryCard
