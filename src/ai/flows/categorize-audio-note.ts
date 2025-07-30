@@ -25,7 +25,8 @@ export type CategorizeAudioNoteInput = z.infer<typeof CategorizeAudioNoteInputSc
 
 const CategorizeAudioNoteOutputSchema = z.object({
   category: z.string().describe('The category identified for the audio note.'),
-  transcription: z.string().describe('The transcription of the audio note.'),
+  title: z.string().describe('A short, concise title for the audio note.'),
+  transcription: z.string().describe('The full transcription of the audio note.'),
 });
 export type CategorizeAudioNoteOutput = z.infer<typeof CategorizeAudioNoteOutputSchema>;
 
@@ -40,16 +41,16 @@ const prompt = ai.definePrompt({
   input: {schema: CategorizeAudioNoteInputSchema},
   output: {schema: CategorizeAudioNoteOutputSchema},
   model: googleAI.model('gemini-2.0-flash'),
-  prompt: `You are an expert at categorizing audio notes. Your task is to transcribe the given audio note and classify it into one of the provided categories.
+  prompt: `You are an expert at categorizing audio notes. Your task is to transcribe the given audio note, create a short title for it, and classify it into one of the provided categories.
 
 If the content of the audio note doesn't fit well into any of the existing categories, you should create a new, relevant category for it.
 
 **Instructions:**
 1.  Transcribe the audio note accurately.
-2.  Analyze the transcription.
-3.  Choose the most appropriate category from the list provided.
+2.  Based on the transcription, create a short, concise title (4-5 words max).
+3.  Analyze the transcription to choose the most appropriate category from the list provided.
 4.  If no existing category is a good fit, create a new one.
-5.  Return the chosen or new category and the transcription.
+5.  Return the chosen or new category, the generated title, and the full transcription.
 
 **Audio Note:**
 {{media url=audio}}

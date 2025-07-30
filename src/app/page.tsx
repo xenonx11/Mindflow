@@ -20,6 +20,7 @@ type Thought = {
     id: string;
     type: 'text' | 'audio';
     content: string; // text content or audio data URI
+    title?: string; // for audio
     transcription?: string; // for audio
 };
 
@@ -446,7 +447,7 @@ export default function Home() {
         setLoadingText("Analyzing audio...");
         try {
             const existingCategories = categorizedThoughts?.map(c => c.category) || [];
-            const { category, transcription } = await categorizeAudioNote({
+            const { category, title, transcription } = await categorizeAudioNote({
                 audio: audioDataUri,
                 existingCategories,
             });
@@ -455,6 +456,7 @@ export default function Home() {
                 id: crypto.randomUUID(),
                 type: 'audio',
                 content: audioDataUri,
+                title: title,
                 transcription: transcription,
             };
     
@@ -707,7 +709,7 @@ function EditableThought({ thought, categoryIndex, thoughtIndex, onSave, onCance
                                                         <Button variant="ghost" size="icon" onClick={() => togglePlayPause(thought)}>
                                                             {playingAudioId === thought.id ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
                                                         </Button>
-                                                        <div className="flex-grow text-sm italic">{thought.transcription || 'Audio Note'}</div>
+                                                        <div className="flex-grow text-sm italic">{thought.title || 'Audio Note'}</div>
                                                     </div>
                                                 )}
 
@@ -769,5 +771,3 @@ function EditableThought({ thought, categoryIndex, thoughtIndex, onSave, onCance
     </div>
   );
 }
-
-
