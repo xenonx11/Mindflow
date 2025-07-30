@@ -31,7 +31,7 @@ type CategorizedThoughtGroup = {
 
 type CategorizedThoughts = CategorizedThoughtGroup[];
 
-const DraggableThought = React.memo(({ thought, categoryIndex, thoughtIndex }: { thought: Thought; categoryIndex: number; thoughtIndex: number; }) => {
+const DraggableThought = React.memo(({ thought, categoryIndex, thoughtIndex, onTogglePlayPause, playingAudioId }: { thought: Thought; categoryIndex: number; thoughtIndex: number; onTogglePlayPause: (thought: Thought) => void; playingAudioId: string | null; }) => {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: `draggable-${categoryIndex}-${thoughtIndex}`,
         data: { thought, fromCategoryIndex: categoryIndex, fromThoughtIndex: thoughtIndex },
@@ -50,7 +50,7 @@ const DraggableThought = React.memo(({ thought, categoryIndex, thoughtIndex }: {
                     xmlns="http://www.w3.org/2000/svg"
                     width="24"
                     height="24"
-                    viewBox="0 0 24 24"
+                    viewBox="0 0 24"
                     fill="none"
                     stroke="currentColor"
                     strokeWidth="2"
@@ -64,7 +64,18 @@ const DraggableThought = React.memo(({ thought, categoryIndex, thoughtIndex }: {
                     <circle cx="15" cy="15" r="1" />
                 </svg>
             </button>
-            <div className="flex-grow">{thought.content}</div>
+            <div className="flex-grow">
+                {thought.type === 'text' ? (
+                    <div>{thought.content}</div>
+                ) : (
+                    <div className="flex items-center gap-2">
+                         <Button variant="ghost" size="icon" onClick={() => onTogglePlayPause(thought)}>
+                            {playingAudioId === thought.id ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+                        </Button>
+                        <div className="flex-grow text-sm italic">{thought.title || 'Audio Note'}</div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 });
@@ -711,18 +722,15 @@ function EditableThought({ thought, categoryIndex, thoughtIndex, onSave, onCance
                                             />
                                         ) : (
                                             <>
-                                                {thought.type === 'text' ? (
-                                                    <div className="flex-grow flex items-center">
-                                                        <DraggableThought thought={thought} categoryIndex={categoryIndex} thoughtIndex={thoughtIndex} />
-                                                    </div>
-                                                ) : (
-                                                    <div className="flex-grow flex items-center gap-2">
-                                                        <Button variant="ghost" size="icon" onClick={() => togglePlayPause(thought)}>
-                                                            {playingAudioId === thought.id ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
-                                                        </Button>
-                                                        <div className="flex-grow text-sm italic">{thought.title || 'Audio Note'}</div>
-                                                    </div>
-                                                )}
+                                                <div className="flex-grow flex items-center">
+                                                    <DraggableThought
+                                                        thought={thought}
+                                                        categoryIndex={categoryIndex}
+                                                        thoughtIndex={thoughtIndex}
+                                                        onTogglePlayPause={togglePlayPause}
+                                                        playingAudioId={playingAudioId}
+                                                    />
+                                                </div>
 
                                                 <div className="flex items-center">
                                                     <Button
