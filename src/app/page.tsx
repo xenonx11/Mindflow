@@ -10,7 +10,7 @@ import type { GroupThoughtsIntoCategoriesOutput } from '@/ai/flows/group-thought
 import { groupThoughtsIntoCategories } from '@/ai/flows/group-thoughts-into-categories';
 import { transformToChatGPTprompt } from '@/ai/flows/transform-to-chatgpt-prompt';
 import { categorizeAudioNote } from '@/ai/flows/categorize-audio-note';
-import { LoaderCircle, Send, Trash2, BrainCircuit, Edit, Check, RefreshCcw, PlusSquare, Trash, Plus, Mic, Square, Play, Pause, X, Lock, Unlock } from 'lucide-react';
+import { LoaderCircle, Send, Trash2, BrainCircuit, Edit, Check, RefreshCcw, PlusSquare, Trash, Plus, Mic, Square, Play, Pause, X, Lock, Unlock, Grip, MoreVertical } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Input } from '@/components/ui/input';
 import { ThemeSwitcher } from '@/components/theme-switcher';
@@ -36,7 +36,6 @@ type CategorizedThoughtGroup = {
 type CategorizedThoughts = CategorizedThoughtGroup[];
 
 // --- Helper Components ---
-
 const DraggableThought = React.memo(({ thought, onTogglePlayPause, playingAudioId }: { thought: Thought; onTogglePlayPause: (thought: Thought) => void; playingAudioId: string | null; }) => {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: `draggable-${thought.id}`,
@@ -46,7 +45,6 @@ const DraggableThought = React.memo(({ thought, onTogglePlayPause, playingAudioI
     const style = transform ? {
         transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
         zIndex: 100,
-        cursor: 'grabbing',
     } : undefined;
 
     const handlePlayPauseClick = (e: React.MouseEvent) => {
@@ -55,13 +53,17 @@ const DraggableThought = React.memo(({ thought, onTogglePlayPause, playingAudioI
     };
 
     return (
-        <div ref={setNodeRef} style={style} className="flex items-center w-full" {...listeners} {...attributes}>
+        <div style={style} className="flex items-center w-full gap-2">
+            <div ref={setNodeRef} {...listeners} {...attributes} className="cursor-grab touch-none flex items-center justify-center">
+                <Grip className="h-5 w-5 text-muted-foreground/50 hidden md:block" />
+                <MoreVertical className="h-5 w-5 text-muted-foreground/50 md:hidden" />
+            </div>
             <div className="flex-grow min-w-0">
                 {thought.type === 'text' ? (
                     <div className="text-sm md:text-base">{thought.content}</div>
                 ) : (
                     <div className="flex items-center gap-2">
-                         <Button variant="ghost" size="icon" onClick={handlePlayPauseClick} className="h-8 w-8 md:h-10 md:w-10">
+                         <Button variant="ghost" size="icon" onClick={handlePlayPauseClick} className="h-8 w-8 md:h-10 md:w-10 flex-shrink-0">
                             {playingAudioId === thought.id ? <Pause className="h-4 w-4 md:h-5 md:w-5" /> : <Play className="h-4 w-4 md:h-5 md:w-5" />}
                         </Button>
                         <div className="flex-grow text-sm md:text-base italic truncate">{thought.title || 'Audio Note'}</div>
@@ -382,7 +384,7 @@ export default function Home() {
         if (!thoughts) return '';
         return thoughts
             .flatMap(group => 
-                group.thoughts.map(t => t.type === 'text' ? t.content : t.transcription)
+                group.thoughts.map(t => t.type === 'text' ? t.content : t.transcription || ''),
             )
             .filter(Boolean)
             .join('\n');
