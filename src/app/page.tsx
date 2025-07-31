@@ -55,25 +55,6 @@ const DraggableThought = React.memo(({ thought, onTogglePlayPause, playingAudioI
 
     return (
         <div ref={setNodeRef} style={style} className="flex items-center w-full" {...listeners} {...attributes}>
-            <div className="hidden md:block cursor-grab p-1">
-                <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="h-5 w-5 text-muted-foreground"
-                >
-                    <circle cx="9" cy="9" r="1" />
-                    <circle cx="9" cy="15" r="1" />
-                    <circle cx="15" cy="9" r="1" />
-                    <circle cx="15" cy="15" r="1" />
-                </svg>
-            </div>
             <div className="flex-grow min-w-0">
                 {thought.type === 'text' ? (
                     <div className="text-sm md:text-base">{thought.content}</div>
