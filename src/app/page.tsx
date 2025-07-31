@@ -14,7 +14,7 @@ import { LoaderCircle, Send, Trash2, BrainCircuit, Edit, Check, RefreshCcw, Plus
 import { useToast } from "@/hooks/use-toast";
 import { Input } from '@/components/ui/input';
 import { ThemeSwitcher } from '@/components/theme-switcher';
-import { DndContext, useDraggable, useDroppable, PointerSensor, KeyboardSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
+import { DndContext, useDraggable, useDroppable, PointerSensor, KeyboardSensor, useSensor, useSensors, DragEndEvent, TouchSensor } from '@dnd-kit/core';
 
 type Thought = {
     id: string;
@@ -46,8 +46,8 @@ const DraggableThought = React.memo(({ thought, onTogglePlayPause, playingAudioI
     } : undefined;
 
     return (
-        <div ref={setNodeRef} style={style} className="flex items-center w-full">
-            <button {...listeners} {...attributes} className="cursor-grab p-1">
+        <div ref={setNodeRef} style={style} className="flex items-center w-full" {...listeners} {...attributes}>
+            <div className="hidden md:block cursor-grab p-1">
                 <svg
                     xmlns="http://www.w3.org/2000/svg"
                     width="24"
@@ -65,7 +65,7 @@ const DraggableThought = React.memo(({ thought, onTogglePlayPause, playingAudioI
                     <circle cx="15" cy="9" r="1" />
                     <circle cx="15" cy="15" r="1" />
                 </svg>
-            </button>
+            </div>
             <div className="flex-grow">
                 {thought.type === 'text' ? (
                     <div>{thought.content}</div>
@@ -331,7 +331,14 @@ export default function Home() {
 
     const sensors = useSensors(
         useSensor(PointerSensor),
-        useSensor(KeyboardSensor)
+        useSensor(KeyboardSensor),
+        useSensor(TouchSensor, {
+            // Press delay of 250ms, with a tolerance of 5px of movement
+            activationConstraint: {
+              delay: 250,
+              tolerance: 5,
+            },
+        })
     );
 
     useEffect(() => {
@@ -793,9 +800,9 @@ export default function Home() {
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
-      <header className="py-6 md:py-8 bg-background border-b">
+      <header className="py-4 md:py-6 bg-background border-b">
         <div className="container mx-auto px-4 md:px-6 flex justify-between items-center">
-          <div className="flex items-center gap-3 md:gap-4">
+          <div className="flex items-center gap-2 md:gap-4">
             <BrainCircuit className="w-8 h-8 md:w-12 md:h-12 text-primary" />
             <div className="text-left">
               <h1 className="text-2xl md:text-5xl font-bold font-headline tracking-tighter">
