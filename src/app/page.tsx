@@ -10,11 +10,14 @@ import type { GroupThoughtsIntoCategoriesOutput } from '@/ai/flows/group-thought
 import { groupThoughtsIntoCategories } from '@/ai/flows/group-thoughts-into-categories';
 import { transformToChatGPTprompt } from '@/ai/flows/transform-to-chatgpt-prompt';
 import { categorizeAudioNote } from '@/ai/flows/categorize-audio-note';
-import { LoaderCircle, Send, Trash2, BrainCircuit, Edit, Check, RefreshCcw, PlusSquare, Trash, Plus, Mic, Square, Play, Pause, X } from 'lucide-react';
+import { LoaderCircle, Send, Trash2, BrainCircuit, Edit, Check, RefreshCcw, PlusSquare, Trash, Plus, Mic, Square, Play, Pause, X, Lock, Unlock } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Input } from '@/components/ui/input';
 import { ThemeSwitcher } from '@/components/theme-switcher';
-import { DndContext, useDraggable, useDroppable, PointerSensor, KeyboardSensor, useSensor, useSensors, DragEndEvent, TouchSensor } from '@dnd-kit/core';
+import { DndContext, PointerSensor, KeyboardSensor, useSensor, useSensors, DragEndEvent, TouchSensor } from '@dnd-kit/core';
+import { useDraggable, useDroppable } from '@dnd-kit/core';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { InputOTP, InputOTPGroup, InputOTPSlot, InputOTPSeparator } from '@/components/ui/input-otp';
 
 type Thought = {
     id: string;
@@ -66,15 +69,15 @@ const DraggableThought = React.memo(({ thought, onTogglePlayPause, playingAudioI
                     <circle cx="15" cy="15" r="1" />
                 </svg>
             </div>
-            <div className="flex-grow">
+            <div className="flex-grow min-w-0">
                 {thought.type === 'text' ? (
-                    <div>{thought.content}</div>
+                    <div className="text-sm md:text-base">{thought.content}</div>
                 ) : (
                     <div className="flex items-center gap-2">
-                         <Button variant="ghost" size="icon" onClick={() => onTogglePlayPause(thought)}>
-                            {playingAudioId === thought.id ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+                         <Button variant="ghost" size="icon" onClick={() => onTogglePlayPause(thought)} className="h-8 w-8 md:h-10 md:w-10">
+                            {playingAudioId === thought.id ? <Pause className="h-4 w-4 md:h-5 md:w-5" /> : <Play className="h-4 w-4 md:h-5 md:w-5" />}
                         </Button>
-                        <div className="flex-grow text-sm italic">{thought.title || 'Audio Note'}</div>
+                        <div className="flex-grow text-sm md:text-base italic truncate">{thought.title || 'Audio Note'}</div>
                     </div>
                 )}
             </div>
@@ -105,7 +108,7 @@ function EditableCategoryTitle({ category, categoryIndex, onSave, onCancel }: { 
                 ref={inputRef} 
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                className="flex-grow"
+                className="flex-grow h-9 text-base"
                 onBlur={handleSave}
                 onKeyDown={(e) => {
                     if (e.key === 'Enter') handleSave();
@@ -128,7 +131,7 @@ function EditableThought({ thought, categoryIndex, thoughtIndex, onSave, onCance
         if (text.trim()) {
             onSave(categoryIndex, thoughtIndex, text);
         } else {
-            onCancel(); // Cancel if the new text is empty
+            onCancel();
         }
     };
     
@@ -142,7 +145,7 @@ function EditableThought({ thought, categoryIndex, thoughtIndex, onSave, onCance
     }, []);
 
     const Component = isAudio ? Input : Textarea;
-    const props = isAudio ? { ref: inputRef } : { ref: inputRef, rows: 2 };
+    const props = isAudio ? { ref: inputRef, className: "h-9" } : { ref: inputRef, rows: 2 };
 
     return (
         <div className="flex-grow flex items-center gap-2 w-full">
@@ -217,7 +220,7 @@ const ThoughtCategoryCard = React.memo(({
     return (
         <div className="animate-in fade-in-0 zoom-in-95 duration-500 inline-block w-full break-inside-avoid">
             <Card className="shadow-lg hover:shadow-xl transition-shadow flex flex-col h-full">
-                <CardHeader className="flex-row items-center gap-2">
+                <CardHeader className="flex-row items-center gap-2 p-4 md:p-6">
                     {editingCategory === categoryIndex ? (
                         <EditableCategoryTitle
                             category={card}
@@ -227,7 +230,7 @@ const ThoughtCategoryCard = React.memo(({
                         />
                     ) : (
                         <>
-                            <CardTitle className="capitalize font-headline flex-grow">{card.category}</CardTitle>
+                            <CardTitle className="capitalize font-headline flex-grow text-xl md:text-2xl">{card.category}</CardTitle>
                             <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => onAddThought(categoryIndex)}>
                                 <Plus className="h-4 w-4 text-muted-foreground hover:text-primary" />
                                 <span className="sr-only">Add thought</span>
@@ -243,10 +246,10 @@ const ThoughtCategoryCard = React.memo(({
                         </>
                     )}
                 </CardHeader>
-                <CardContent className="flex-grow">
+                <CardContent className="flex-grow p-4 md:p-6 pt-0">
                     <ul className="space-y-3">
                         {card.thoughts.map((thought, thoughtIndex) => (
-                            <li key={thought.id} className="flex items-start justify-between gap-2 p-3 rounded-md bg-secondary/50">
+                            <li key={thought.id} className="flex items-start justify-between gap-2 p-2 md:p-3 rounded-md bg-secondary/50">
                                 {editingThought?.categoryIndex === categoryIndex && editingThought?.thoughtIndex === thoughtIndex ? (
                                     <EditableThought
                                         thought={thought}
@@ -326,6 +329,13 @@ export default function Home() {
   const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  const [isPrivateMode, setIsPrivateMode] = useState(false);
+  const [showPasscodeSetup, setShowPasscodeSetup] = useState(false);
+  const [showPasscodeEntry, setShowPasscodeEntry] = useState(false);
+  const [passcode, setPasscode] = useState('');
+  const [confirmPasscode, setConfirmPasscode] = useState('');
+  const [enteredPasscode, setEnteredPasscode] = useState('');
+  const [passcodeError, setPasscodeError] = useState('');
 
   const { toast } = useToast();
 
@@ -333,7 +343,6 @@ export default function Home() {
         useSensor(PointerSensor),
         useSensor(KeyboardSensor),
         useSensor(TouchSensor, {
-            // Press delay of 250ms, with a tolerance of 5px of movement
             activationConstraint: {
               delay: 250,
               tolerance: 5,
@@ -341,21 +350,25 @@ export default function Home() {
         })
     );
 
+    const storageKey = useMemo(() => isPrivateMode ? 'privateCategorizedThoughts' : 'categorizedThoughts', [isPrivateMode]);
+
     useEffect(() => {
-        const savedThoughts = localStorage.getItem('categorizedThoughts');
+        const savedThoughts = localStorage.getItem(storageKey);
         if (savedThoughts) {
             setCategorizedThoughts(JSON.parse(savedThoughts));
+        } else {
+            setCategorizedThoughts(null);
         }
-    }, []);
+    }, [storageKey]);
 
     const updateLocalStorage = useCallback((newThoughts: CategorizedThoughts | null) => {
         if (newThoughts) {
-            localStorage.setItem('categorizedThoughts', JSON.stringify(newThoughts));
+            localStorage.setItem(storageKey, JSON.stringify(newThoughts));
         } else {
-            localStorage.removeItem('categorizedThoughts');
+            localStorage.removeItem(storageKey);
         }
         setCategorizedThoughts(newThoughts);
-    }, []);
+    }, [storageKey]);
 
     const reGenerateBrainDumpFromThoughts = (thoughts: CategorizedThoughts | null) => {
         if (!thoughts) return '';
@@ -404,10 +417,9 @@ export default function Home() {
             thoughts: group.thoughts.flatMap(thoughtText => {
                 const existingThought = existingThoughtsMap.get(thoughtText);
                 if (existingThought) {
-                    existingThoughtsMap.delete(thoughtText); // Remove from map to handle duplicates
+                    existingThoughtsMap.delete(thoughtText);
                     return [existingThought];
                 }
-                // It's a new text thought from the brain dump
                 return [{
                     id: crypto.randomUUID(),
                     type: 'text',
@@ -416,7 +428,6 @@ export default function Home() {
             })
         }));
 
-        // Add any remaining thoughts (e.g. audio notes that were not re-categorized) to a 'Misc' category
         const remainingThoughts = Array.from(existingThoughtsMap.values());
         if(remainingThoughts.length > 0) {
             const miscCategoryIndex = groupedThoughts.findIndex(g => g.category.toLowerCase() === 'misc');
@@ -426,8 +437,6 @@ export default function Home() {
                 groupedThoughts.push({ category: 'Misc', thoughts: remainingThoughts });
             }
         }
-
-
         updateLocalStorage(groupedThoughts);
     }, [updateLocalStorage]);
 
@@ -783,37 +792,83 @@ export default function Home() {
             };
         }
     }, [playingAudioId]);
+
+    const handlePrivateModeToggle = () => {
+        if (isPrivateMode) {
+            setIsPrivateMode(false);
+            return;
+        }
+
+        const storedPasscode = localStorage.getItem('mindflow-passcode');
+        if (storedPasscode) {
+            setShowPasscodeEntry(true);
+        } else {
+            setShowPasscodeSetup(true);
+        }
+    };
+
+    const handleSetPasscode = () => {
+        setPasscodeError('');
+        if (passcode.length !== 4) {
+            setPasscodeError("Passcode must be 4 digits.");
+            return;
+        }
+        if (passcode !== confirmPasscode) {
+            setPasscodeError("Passcodes do not match.");
+            return;
+        }
+        localStorage.setItem('mindflow-passcode', passcode);
+        setShowPasscodeSetup(false);
+        setIsPrivateMode(true);
+        setPasscode('');
+        setConfirmPasscode('');
+    };
+
+    const handleVerifyPasscode = () => {
+        const storedPasscode = localStorage.getItem('mindflow-passcode');
+        if (enteredPasscode === storedPasscode) {
+            setShowPasscodeEntry(false);
+            setIsPrivateMode(true);
+            setEnteredPasscode('');
+            setPasscodeError('');
+        } else {
+            setPasscodeError("Incorrect passcode.");
+        }
+    };
   
+    function CategoryDropZone({ categoryIndex, children }: { categoryIndex: number; children: React.ReactNode }) {
+        const { setNodeRef, isOver } = useDroppable({
+            id: `droppable-category-${categoryIndex}`,
+            data: { categoryIndex }
+        });
 
-  function CategoryDropZone({ categoryIndex, children }: { categoryIndex: number; children: React.ReactNode }) {
-    const { setNodeRef, isOver } = useDroppable({
-        id: `droppable-category-${categoryIndex}`,
-        data: { categoryIndex }
-    });
-
-    return (
-        <div ref={setNodeRef} className={`rounded-lg ${isOver ? 'bg-accent/80' : ''}`}>
-            {children}
-        </div>
-    );
-}
+        return (
+            <div ref={setNodeRef} className={`rounded-lg ${isOver ? 'bg-accent/80' : ''}`}>
+                {children}
+            </div>
+        );
+    }
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
-      <header className="py-4 md:py-6 bg-background border-b">
-        <div className="container mx-auto px-4 md:px-6 flex justify-between items-center">
+      <header className="py-4 md:py-6 bg-background border-b px-4 md:px-6">
+        <div className="container mx-auto flex justify-between items-center">
           <div className="flex items-center gap-2 md:gap-4">
             <BrainCircuit className="w-8 h-8 md:w-12 md:h-12 text-primary" />
             <div className="text-left">
-              <h1 className="text-2xl md:text-5xl font-bold font-headline tracking-tighter">
+              <h1 className="text-2xl md:text-4xl font-bold font-headline tracking-tighter">
                 MindFlow
               </h1>
-              <p className="text-sm md:text-lg text-muted-foreground">
+              <p className="text-sm md:text-base text-muted-foreground">
                 Untangle your thoughts. Let AI find the patterns.
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2 md:gap-4">
+            <Button variant="ghost" size="icon" onClick={handlePrivateModeToggle}>
+                {isPrivateMode ? <Unlock className="h-5 w-5"/> : <Lock className="h-5 w-5" />}
+                <span className="sr-only">Toggle Private Mode</span>
+            </Button>
             <ThemeSwitcher />
           </div>
         </div>
@@ -828,11 +883,11 @@ export default function Home() {
                 setCurrentBrainDump(e.target.value);
               }}
               placeholder="Dump all your thoughts, ideas, and tasks here. Let your mind flow freely..."
-              className="min-h-[150px] md:min-h-[200px] text-base p-4 rounded-lg shadow-sm"
-              rows={8}
+              className="min-h-[120px] md:min-h-[200px] text-base p-4 rounded-lg shadow-sm"
+              rows={6}
             />
             <div className="flex flex-col sm:flex-row gap-2">
-              <Button onClick={handleAnalyze} disabled={isLoading || isRecording} className="flex-1 text-base py-3 md:text-lg md:py-6">
+              <Button onClick={handleAnalyze} disabled={isLoading || isRecording} className="flex-1 text-base py-2 md:py-3 lg:text-lg lg:py-6">
                 {isLoading ? (
                   <>
                     <LoaderCircle className="animate-spin mr-2" />
@@ -840,14 +895,14 @@ export default function Home() {
                   </>
                 ) : 'Untangle Thoughts'}
               </Button>
-              <Button onClick={isRecording ? stopRecording : startRecording} disabled={isLoading} className="text-base py-3 md:text-lg md:py-6" variant={isRecording ? 'destructive' : 'outline'}>
+              <Button onClick={isRecording ? stopRecording : startRecording} disabled={isLoading} className="text-base py-2 md:py-3 lg:text-lg lg:py-6" variant={isRecording ? 'destructive' : 'outline'}>
                 {isRecording ? (
                     <>
-                        <Square className="mr-2" /> Stop
+                        <Square className="mr-2 h-4 w-4" /> Stop
                     </>
                 ) : (
                     <>
-                        <Mic className="mr-2" /> Record
+                        <Mic className="mr-2 h-4 w-4" /> Record
                     </>
                 )}
               </Button>
@@ -882,7 +937,7 @@ export default function Home() {
                 </div>
                 </div>
                 {categorizedThoughts && categorizedThoughts.length > 0 && (
-                    <div className="space-y-6 md:columns-2 lg:columns-3 md:gap-6 md:space-y-6">
+                     <div className="space-y-6 md:columns-2 lg:columns-3 md:gap-6 md:space-y-6">
                     {categorizedThoughts.map((card, categoryIndex) => (
                         <CategoryDropZone key={`${card.category}-${categoryIndex}`} categoryIndex={categoryIndex}>
                             <ThoughtCategoryCard
@@ -911,6 +966,67 @@ export default function Home() {
             </div>
         </DndContext>
       </main>
+
+       {/* Passcode Setup Dialog */}
+       <Dialog open={showPasscodeSetup} onOpenChange={setShowPasscodeSetup}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Set Up Private Mode Passcode</DialogTitle>
+                    <DialogDescription>
+                        Create a 4-digit passcode to secure your private thoughts.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="flex flex-col gap-4 py-4">
+                    <InputOTP maxLength={4} value={passcode} onChange={setPasscode}>
+                        <InputOTPGroup>
+                            <InputOTPSlot index={0} />
+                            <InputOTPSlot index={1} />
+                            <InputOTPSlot index={2} />
+                            <InputOTPSlot index={3} />
+                        </InputOTPGroup>
+                    </InputOTP>
+                    <InputOTP maxLength={4} value={confirmPasscode} onChange={setConfirmPasscode}>
+                         <InputOTPGroup>
+                            <InputOTPSlot index={0} />
+                            <InputOTPSlot index={1} />
+                            <InputOTPSlot index={2} />
+                            <InputOTPSlot index={3} />
+                        </InputOTPGroup>
+                    </InputOTP>
+                    {passcodeError && <p className="text-destructive text-sm text-center">{passcodeError}</p>}
+                </div>
+                <DialogFooter>
+                    <Button onClick={handleSetPasscode}>Save Passcode</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+
+        {/* Passcode Entry Dialog */}
+        <Dialog open={showPasscodeEntry} onOpenChange={setShowPasscodeEntry}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Enter Passcode</DialogTitle>
+                    <DialogDescription>
+                        Enter your 4-digit passcode to access private mode.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="flex flex-col gap-4 py-4 items-center">
+                    <InputOTP maxLength={4} value={enteredPasscode} onChange={setEnteredPasscode}>
+                         <InputOTPGroup>
+                            <InputOTPSlot index={0} />
+                            <InputOTPSlot index={1} />
+                            <InputOTPSlot index={2} />
+                            <InputOTPSlot index={3} />
+                        </InputOTPGroup>
+                    </InputOTP>
+                    {passcodeError && <p className="text-destructive text-sm text-center">{passcodeError}</p>}
+                </div>
+                <DialogFooter>
+                    <Button onClick={handleVerifyPasscode}>Enter</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+
 
       <footer className="py-4 text-center text-sm text-muted-foreground border-t bg-background">
         <p>Powered by AI. Built with Next.js and Genkit.</p>
