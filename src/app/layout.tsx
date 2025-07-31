@@ -1,3 +1,4 @@
+
 import type {Metadata} from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster"
@@ -6,8 +7,10 @@ import { ThemeProvider } from '@/components/theme-provider';
 export const metadata: Metadata = {
   title: 'MindFlow',
   description: 'Organize your thoughts with AI.',
+  manifest: '/manifest.json',
   icons: {
     icon: '/logo.svg',
+    apple: '/logo.svg',
   },
 };
 
