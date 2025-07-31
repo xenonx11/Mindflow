@@ -784,22 +784,45 @@ export default function Home() {
     };
 
     const togglePlayPause = useCallback((thought: Thought) => {
-        if (playingAudioId === thought.id && audioRef.current) {
-            audioRef.current.pause();
-            setPlayingAudioId(null);
+        if (playingAudioId === thought.id) {
+            if (audioRef.current) {
+                audioRef.current.pause();
+                setPlayingAudioId(null);
+            }
         } else {
             if (audioRef.current) {
                 audioRef.current.pause();
             }
+            
             const newAudio = new Audio(thought.content);
             audioRef.current = newAudio;
-            newAudio.play();
+            
+            newAudio.play().catch(e => {
+                console.error("Audio play failed:", e)
+                toast({
+                    title: "Playback Error",
+                    description: "Could not play audio. Please try again.",
+                    variant: "destructive",
+                });
+                setPlayingAudioId(null);
+            });
+            
             setPlayingAudioId(thought.id);
+            
             newAudio.onended = () => {
                 setPlayingAudioId(null);
             };
+             newAudio.onerror = () => {
+                console.error("Audio element error")
+                toast({
+                    title: "Playback Error",
+                    description: "An error occurred while trying to play the audio.",
+                    variant: "destructive",
+                });
+                setPlayingAudioId(null);
+            };
         }
-    }, [playingAudioId]);
+    }, [playingAudioId, toast]);
 
     const handlePrivateModeToggle = () => {
         if (isPrivateMode) {
