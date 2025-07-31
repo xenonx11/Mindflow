@@ -6,6 +6,9 @@ import { ThemeProvider } from '@/components/theme-provider';
 export const metadata: Metadata = {
   title: 'MindFlow',
   description: 'Organize your thoughts with AI.',
+  icons: {
+    icon: '/logo.svg',
+  },
 };
 
 export default function RootLayout({
