@@ -17,6 +17,7 @@ import { ThemeSwitcher } from '@/components/theme-switcher';
 import { DndContext, PointerSensor, KeyboardSensor, useSensor, useSensors, DragEndEvent, TouchSensor } from '@dnd-kit/core';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { InputOTP, InputOTPGroup, InputOTPSlot, InputOTPSeparator } from '@/components/ui/input-otp';
 
 type Thought = {
@@ -323,6 +324,8 @@ export default function Home() {
   const [confirmPasscode, setConfirmPasscode] = useState('');
   const [enteredPasscode, setEnteredPasscode] = useState('');
   const [passcodeError, setPasscodeError] = useState('');
+
+  const [showClearAllConfirmation, setShowClearAllConfirmation] = useState(false);
 
   const { toast } = useToast();
 
@@ -938,10 +941,26 @@ export default function Home() {
                         <RefreshCcw className="w-4 h-4 mr-2" />
                         Reorganize
                     </Button>
-                    <Button variant="outline" size="sm" onClick={handleClearAll} disabled={isLoading || !categorizedThoughts}>
-                        <Trash className="w-4 h-4 mr-2" />
-                        All Clear
-                    </Button>
+                    <AlertDialog open={showClearAllConfirmation} onOpenChange={setShowClearAllConfirmation}>
+                        <AlertDialogTrigger asChild>
+                            <Button variant="outline" size="sm" disabled={isLoading || !categorizedThoughts}>
+                                <Trash className="w-4 h-4 mr-2" />
+                                All Clear
+                            </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    This action cannot be undone. This will permanently delete all your categorized thoughts.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={handleClearAll}>Confirm</AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
                 </div>
                 </div>
                 {categorizedThoughts && categorizedThoughts.length > 0 && (
