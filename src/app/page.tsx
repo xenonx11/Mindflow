@@ -10,7 +10,7 @@ import type { GroupThoughtsIntoCategoriesOutput } from '@/ai/flows/group-thought
 import { groupThoughtsIntoCategories } from '@/ai/flows/group-thoughts-into-categories';
 import { transformToChatGPTprompt } from '@/ai/flows/transform-to-chatgpt-prompt';
 import { categorizeAudioNote } from '@/ai/flows/categorize-audio-note';
-import { LoaderCircle, Send, Trash2, BrainCircuit, Edit, Check, RefreshCcw, PlusSquare, Trash, Plus, Mic, Square, Play, Pause, X, Lock, Unlock, Grip, MoreVertical } from 'lucide-react';
+import { LoaderCircle, Send, Trash2, BrainCircuit, Edit, Check, RefreshCcw, PlusSquare, Trash, Plus, Mic, Square, Play, Pause, X, Lock, Unlock, MoreVertical } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Input } from '@/components/ui/input';
 import { ThemeSwitcher } from '@/components/theme-switcher';
@@ -36,7 +36,7 @@ type CategorizedThoughtGroup = {
 type CategorizedThoughts = CategorizedThoughtGroup[];
 
 // --- Helper Components ---
-const DraggableThought = React.memo(({ thought, onTogglePlayPause, playingAudioId }: { thought: Thought; onTogglePlayPause: (thought: Thought) => void; playingAudioId: string | null; }) => {
+const DraggableThought = React.memo(({ thought, onTogglePlayPause, playingAudioId }: { thought: Thought; onTogglePlayPause: (id: string, content: string) => void; playingAudioId: string | null; }) => {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: `draggable-${thought.id}`,
         data: { thought },
@@ -49,14 +49,45 @@ const DraggableThought = React.memo(({ thought, onTogglePlayPause, playingAudioI
 
     const handlePlayPauseClick = (e: React.MouseEvent) => {
         e.stopPropagation();
-        onTogglePlayPause(thought);
+        onTogglePlayPause(thought.id, thought.content);
     };
+
+    const GripIcon = () => (
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 text-muted-foreground/50">
+          <circle cx="9" cy="12" r="1"></circle>
+          <circle cx="9" cy="5" r="1"></circle>
+          <circle cx="9" cy="19" r="1"></circle>
+          <circle cx="15" cy="12" r="1"></circle>
+          <circle cx="15" cy="5" r="1"></circle>
+          <circle cx="15" cy="19" r="1"></circle>
+      </svg>
+    );
+
+    const FourDotsIcon = () => (
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" className="text-muted-foreground/50">
+        <circle cx="6" cy="6" r="1.5" />
+        <circle cx="14" cy="6" r="1.5" />
+        <circle cx="6" cy="14" r="1.5" />
+        <circle cx="14" cy="14" r="1.5" />
+      </svg>
+    );
+
+    const TwoDotsIcon = () => (
+       <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" className="text-muted-foreground/50">
+        <circle cx="6" cy="10" r="1.5" />
+        <circle cx="14" cy="10" r="1.5" />
+      </svg>
+    );
 
     return (
         <div style={style} className="flex items-center w-full gap-2">
             <div ref={setNodeRef} {...listeners} {...attributes} className="cursor-grab touch-none flex items-center justify-center">
-                <Grip className="h-5 w-5 text-muted-foreground/50 hidden md:block" />
-                <MoreVertical className="h-5 w-5 text-muted-foreground/50 md:hidden" />
+                <div className="hidden md:block">
+                  <FourDotsIcon />
+                </div>
+                <div className="md:hidden">
+                  <TwoDotsIcon />
+                </div>
             </div>
             <div className="flex-grow min-w-0">
                 {thought.type === 'text' ? (
@@ -201,7 +232,7 @@ const ThoughtCategoryCard = React.memo(({
     onDeleteCategory: (categoryIndex: number) => void;
     onSaveThought: (categoryIndex: number, thoughtIndex: number, newText: string) => void;
     onSetEditingThought: (details: { categoryIndex: number, thoughtIndex: number } | null) => void;
-    onTogglePlayPause: (thought: Thought) => void;
+    onTogglePlayPause: (id: string, content: string) => void;
     onSendThoughtToChatGPT: (thought: Thought) => void;
     onEditThought: (categoryIndex: number, thoughtIndex: number) => void;
     onDeleteThought: (categoryIndex: number, thoughtIndex: number) => void;
@@ -785,8 +816,8 @@ export default function Home() {
         }
     };
 
-    const togglePlayPause = useCallback((thought: Thought) => {
-        if (playingAudioId === thought.id) {
+    const togglePlayPause = useCallback((id: string, content: string) => {
+        if (playingAudioId === id) {
             if (audioRef.current) {
                 audioRef.current.pause();
                 setPlayingAudioId(null);
@@ -796,7 +827,7 @@ export default function Home() {
                 audioRef.current.pause();
             }
             
-            const newAudio = new Audio(thought.content);
+            const newAudio = new Audio(content);
             audioRef.current = newAudio;
             
             newAudio.play().catch(e => {
@@ -809,7 +840,7 @@ export default function Home() {
                 setPlayingAudioId(null);
             });
             
-            setPlayingAudioId(thought.id);
+            setPlayingAudioId(id);
             
             newAudio.onended = () => {
                 setPlayingAudioId(null);
