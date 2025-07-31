@@ -316,6 +316,7 @@ ThoughtCategoryCard.displayName = "ThoughtCategoryCard";
 
 
 export default function Home() {
+  const [isMounted, setIsMounted] = useState(false);
   const [currentBrainDump, setCurrentBrainDump] = useState('');
   const [categorizedThoughts, setCategorizedThoughts] = useState<CategorizedThoughts | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -353,22 +354,39 @@ export default function Home() {
     const storageKey = useMemo(() => isPrivateMode ? 'privateCategorizedThoughts' : 'categorizedThoughts', [isPrivateMode]);
 
     useEffect(() => {
-        const savedThoughts = localStorage.getItem(storageKey);
-        if (savedThoughts) {
-            setCategorizedThoughts(JSON.parse(savedThoughts));
-        } else {
-            setCategorizedThoughts(null);
+        setIsMounted(true);
+    }, []);
+
+    useEffect(() => {
+        if (isMounted) {
+            try {
+                const savedThoughts = localStorage.getItem(storageKey);
+                if (savedThoughts) {
+                    setCategorizedThoughts(JSON.parse(savedThoughts));
+                } else {
+                    setCategorizedThoughts(null);
+                }
+            } catch (error) {
+                console.error("Failed to parse thoughts from localStorage", error);
+                setCategorizedThoughts(null);
+            }
         }
-    }, [storageKey]);
+    }, [storageKey, isMounted]);
 
     const updateLocalStorage = useCallback((newThoughts: CategorizedThoughts | null) => {
-        if (newThoughts) {
-            localStorage.setItem(storageKey, JSON.stringify(newThoughts));
-        } else {
-            localStorage.removeItem(storageKey);
+        if (isMounted) {
+            try {
+                if (newThoughts) {
+                    localStorage.setItem(storageKey, JSON.stringify(newThoughts));
+                } else {
+                    localStorage.removeItem(storageKey);
+                }
+            } catch (error) {
+                 console.error("Failed to update localStorage", error);
+            }
         }
         setCategorizedThoughts(newThoughts);
-    }, [storageKey]);
+    }, [storageKey, isMounted]);
 
     const reGenerateBrainDumpFromThoughts = (thoughts: CategorizedThoughts | null) => {
         if (!thoughts) return '';
@@ -848,6 +866,9 @@ export default function Home() {
             </div>
         );
     }
+  if (!isMounted) {
+    return null;
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
