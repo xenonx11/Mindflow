@@ -48,6 +48,11 @@ const DraggableThought = React.memo(({ thought, onTogglePlayPause, playingAudioI
         cursor: 'grabbing',
     } : undefined;
 
+    const handlePlayPauseClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        onTogglePlayPause(thought);
+    };
+
     return (
         <div ref={setNodeRef} style={style} className="flex items-center w-full" {...listeners} {...attributes}>
             <div className="hidden md:block cursor-grab p-1">
@@ -74,7 +79,7 @@ const DraggableThought = React.memo(({ thought, onTogglePlayPause, playingAudioI
                     <div className="text-sm md:text-base">{thought.content}</div>
                 ) : (
                     <div className="flex items-center gap-2">
-                         <Button variant="ghost" size="icon" onClick={() => onTogglePlayPause(thought)} className="h-8 w-8 md:h-10 md:w-10">
+                         <Button variant="ghost" size="icon" onClick={handlePlayPauseClick} className="h-8 w-8 md:h-10 md:w-10">
                             {playingAudioId === thought.id ? <Pause className="h-4 w-4 md:h-5 md:w-5" /> : <Play className="h-4 w-4 md:h-5 md:w-5" />}
                         </Button>
                         <div className="flex-grow text-sm md:text-base italic truncate">{thought.title || 'Audio Note'}</div>
@@ -358,33 +363,34 @@ export default function Home() {
     }, []);
 
     useEffect(() => {
-        if (isMounted) {
-            try {
-                const savedThoughts = localStorage.getItem(storageKey);
-                if (savedThoughts) {
-                    setCategorizedThoughts(JSON.parse(savedThoughts));
-                } else {
-                    setCategorizedThoughts(null);
-                }
-            } catch (error) {
-                console.error("Failed to parse thoughts from localStorage", error);
+        if (!isMounted) return;
+
+        try {
+            const savedThoughts = localStorage.getItem(storageKey);
+            if (savedThoughts) {
+                setCategorizedThoughts(JSON.parse(savedThoughts));
+            } else {
                 setCategorizedThoughts(null);
             }
+        } catch (error) {
+            console.error("Failed to parse thoughts from localStorage", error);
+            setCategorizedThoughts(null);
         }
     }, [storageKey, isMounted]);
 
     const updateLocalStorage = useCallback((newThoughts: CategorizedThoughts | null) => {
-        if (isMounted) {
-            try {
-                if (newThoughts) {
-                    localStorage.setItem(storageKey, JSON.stringify(newThoughts));
-                } else {
-                    localStorage.removeItem(storageKey);
-                }
-            } catch (error) {
-                 console.error("Failed to update localStorage", error);
+        if (!isMounted) return;
+        
+        try {
+            if (newThoughts && newThoughts.length > 0) {
+                localStorage.setItem(storageKey, JSON.stringify(newThoughts));
+            } else {
+                localStorage.removeItem(storageKey);
             }
+        } catch (error) {
+                console.error("Failed to update localStorage", error);
         }
+        
         setCategorizedThoughts(newThoughts);
     }, [storageKey, isMounted]);
 
